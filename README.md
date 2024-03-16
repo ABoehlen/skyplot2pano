@@ -1,7 +1,7 @@
 # skyplot2pano
 
 ## Purpose
-skyplot2pano is an AWK script which uses the function of SCOP.SKYPLOT of the TU Wien (Vienna University of Technology) from 1999 for the calculation of panoramas with silhouettes and the determination of visibility parameters. SCOP.SKYPLOT is a small utility programme of the SCOP programme system.
+skyplot2pano is a program written in AWK which uses the function of SCOP.SKYPLOT of the TU Wien (Vienna University of Technology) from 1999 for the calculation of panoramas with silhouettes and the determination of visibility parameters. SCOP.SKYPLOT is a small utility programme of the SCOP programme system.
 The results of skyplot2pano are two text files: The prot file is the log containing the given arguments and various derived information. The sil file is a comma-separated text file that can be visualized by a geographic information system (e.g. ArcGIS, QGIS...) using the X and Y fields. The DiRel field can be used to symbolise the points. The nearest points have the value 0, the furthest points the values 8 or 9. Using the calculated position coordinates, it is possible to localize the displayed peaks.
 
 ## Background
