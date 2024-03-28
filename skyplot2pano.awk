@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         15.03.2024
-# Version:      1.0
+# Date:         28.03.2024
+# Version:      1.2
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten,
 #               nach Distanz abgestuften "Silhouettenlinien"
@@ -30,6 +30,7 @@ BEGIN {
   }
   else {
     ##### vorbereiten #####
+	version = 1.2;
     # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
     x = ARGV[1];
     y = ARGV[2];
@@ -96,7 +97,7 @@ BEGIN {
     umfang = 400 / oeffWink * bildbr;
     radPr = umfang / (2 * pi());
 
-    # sky.rdh verlinken
+    # Hoehenmodell als sky.rdh kopieren
     dhmKopieren(dhm, "sky.rdh");
 
     # Panoramadatei vorbereiten
@@ -114,6 +115,7 @@ BEGIN {
     
     # Arrays zur Speicherung der Extrempunkte initialisieren
     exEntf["Distanz"] = 0;
+	exHoe["z"] = 0;
     exNord["x"] = exOst["x"] = exSued["x"] = exWest["x"] = x;
     exNord["y"] = exOst["y"] = exSued["y"] = exWest["y"] = y;
 
@@ -130,9 +132,9 @@ BEGIN {
     S = maxDists(x, y, (maxSicht * 2), "S");
     W = maxDists(x, y, (maxSicht * 2), "W");
 
-    # Erstellen des SCOP-Input-Files SKYPLOT.CMD mit 0.1 gon azimutaler Aufloesung fuer die Berechnung der Extrempunkte
+    # Erstellen des SCOP-Input-Files SKYPLOT.CMD fuer die Berechnung der Extrempunkte
     resfile = "extr.txt";
-    skyplot("SKYPLOT.CMD", resfile, x, y, z, W, S, E, N, 0.1, aziLi, aziRe, "Extrempunkte");
+    skyplot("SKYPLOT.CMD", resfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, "Extrempunkte");
     
     # Starten von skyplot und Unterdruecken der Ausgabe
     print "Berechnung der Extrempunkte...";
@@ -142,7 +144,13 @@ BEGIN {
     mhoehe = modellhoehe(resfile);
 
     # numerische Ausgabe von Skyplot einlesen
-    maxRec = daten_einlesen(resfile);
+    maxRec = datenEinlesen(resfile);
+
+    # rekonstruieren der azimutalen Aufloesung in gon. Die azimutale Aufloesung kann nicht beliebig klein sein
+	# und haengt vom Oeffnungswinkel ab.
+    # Damit die Darstellung auch dann korrekt erstellt wird, wenn ein zu kleiner Wert eingegeben wird,
+    # muss die tatsaechliche azimutale Aufloesung nachtraeglich aus der numerischen Ausgabe rekonstruiert werden.
+    aufloesAziCalc = oeffWink / (maxRec - 1);
     
     # jeden horizontbildenden Punkt auswerten zwecks Bestimmung der Extrempunkte
     for (i = 1; i <= maxRec; i++ ) {
@@ -154,58 +162,46 @@ BEGIN {
         exEntf["Distanz"] = distanz[i];
         exEntf["Hoehenwinkel"] = hoehenwinkel[i];
       }
+
+      ##### Hoechster Punkt ermitteln #####
+
+      hoehe = hoeheAusDistanzUndWinkel(z, distanz[i], hoehenwinkel[i]);
+      if (hoehe > exHoe["z"]) {
+	    exHoe["z"] = hoehe;
+        exHoe["Azi"] = azi[i];
+        exHoe["Distanz"] = distanz[i];
+        exHoe["Hoehenwinkel"] = hoehenwinkel[i];
+      }
       
       ##### Extrempunkte N, E, S, W ermitteln #####
       
       # Distanz in der Ebene (math. Horizont) ermitteln
-      dist0 = ankathete_aus_hypotenuse_und_winkel(distanz[i], hoehenwinkel[i]);
+      dist0 = ankatheteAusHypotenuseUndWinkel(distanz[i], hoehenwinkel[i]);
       
-      split(bestimme_xy(x, y, dist0, azi[i]), xyAkt, " ")
+      split(bestimmeXY(x, y, dist0, azi[i]), xyAkt, " ")
       if (xyAkt[1] == -1)
         abbruch("\nungueltiges Azimut.");
-      else {
-        if (xyAkt[2] > exNord["y"]) {
-          exNord["x"] = xyAkt[1];
-          exNord["y"] = xyAkt[2];
-		  exNord["Azi"] = azi[i];
-		  exNord["Distanz"] = distanz[i];
-		  exNord["Hoehenwinkel"] = hoehenwinkel[i];
-        }
-        if (xyAkt[1] > exOst["x"]) {
-          exOst["x"] = xyAkt[1];
-          exOst["y"] = xyAkt[2];
-		  exOst["Azi"] = azi[i];
-		  exOst["Distanz"] = distanz[i];
-		  exOst["Hoehenwinkel"] = hoehenwinkel[i];
-        }
-        if (xyAkt[2] < exSued["y"]) {
-          exSued["x"] = xyAkt[1];
-          exSued["y"] = xyAkt[2];
-		  exSued["Azi"] = azi[i];
-		  exSued["Distanz"] = distanz[i];
-		  exSued["Hoehenwinkel"] = hoehenwinkel[i];
-        }
-        if (xyAkt[1] < exWest["x"]) {
-          exWest["x"] = xyAkt[1];
-          exWest["y"] = xyAkt[2];
-		  exWest["Azi"] = azi[i];
-		  exWest["Distanz"] = distanz[i];
-		  exWest["Hoehenwinkel"] = hoehenwinkel[i];
-        }
-      }
+      else
+	    extrempunkteNESW(xyAkt[1], xyAkt[2], azi[i], distanz[i], hoehenwinkel[i]);
+
     }
 	
 	# Z Koordinate der Extrempunkte N, E, S, W bestimmen
-	exNord["z"] = hoehe_aus_distanz_und_winkel(z, exNord["Distanz"], exNord["Hoehenwinkel"]);
-    exOst["z"] = hoehe_aus_distanz_und_winkel(z, exOst["Distanz"], exOst["Hoehenwinkel"]);
-    exSued["z"] = hoehe_aus_distanz_und_winkel(z, exSued["Distanz"], exSued["Hoehenwinkel"]);
-    exWest["z"] = hoehe_aus_distanz_und_winkel(z, exWest["Distanz"], exWest["Hoehenwinkel"]);
+	exNord["z"] = hoeheAusDistanzUndWinkel(z, exNord["Distanz"], exNord["Hoehenwinkel"]);
+    exOst["z"] =  hoeheAusDistanzUndWinkel(z, exOst["Distanz"],  exOst["Hoehenwinkel"]);
+    exSued["z"] = hoeheAusDistanzUndWinkel(z, exSued["Distanz"], exSued["Hoehenwinkel"]);
+    exWest["z"] = hoeheAusDistanzUndWinkel(z, exWest["Distanz"], exWest["Hoehenwinkel"]);
     
     # X/Y/Z Koordinaten des entferntesten Punktes bestimmen
-    dist0 = ankathete_aus_hypotenuse_und_winkel(exEntf["Distanz"], exEntf["Hoehenwinkel"]);
-    if (split(bestimme_xy(x, y, dist0, exEntf["Azi"]), xyEntf, " ") == -1)
+    dist0 = ankatheteAusHypotenuseUndWinkel(exEntf["Distanz"], exEntf["Hoehenwinkel"]);
+    if (split(bestimmeXY(x, y, dist0, exEntf["Azi"]), xyEntf, " ") == -1)
       abbruch("\nungueltiges Azimut.");
-    exEntf["z"] = hoehe_aus_distanz_und_winkel(z, exEntf["Distanz"], exEntf["Hoehenwinkel"]);
+    exEntf["z"] = hoeheAusDistanzUndWinkel(z, exEntf["Distanz"], exEntf["Hoehenwinkel"]);
+
+    # X/Y Koordinaten des hoechsten Punktes bestimmen
+    dist0 = ankatheteAusHypotenuseUndWinkel(exHoe["Distanz"], exHoe["Hoehenwinkel"]);
+    if (split(bestimmeXY(x, y, dist0, exHoe["Azi"]), xyHoe, " ") == -1)
+      abbruch("\nungueltiges Azimut.");
 
     # aufraeumen
     system("rm -f " resfile);
@@ -219,11 +215,11 @@ BEGIN {
     new(bisherigePte);
     existiert = 0;
 
-    # Berechnungen im Abstand von 'aufloesDist' durchfuehren, bis 'maxDist' erreicht ist
     # um fehlerhafte Resultate zu vermeiden, muss der unmittelbare Nahbereich unterdrueckt werden
     if (minDist < 500)
       minDist = 500;
 
+    # Berechnungen im Abstand von 'aufloesDist' durchfuehren, bis 'maxDist' erreicht ist
     for (i = minDist; i <= maxDist; i += aufloesDist) {
 
       # SCOP LIMITS festlegen
@@ -241,12 +237,7 @@ BEGIN {
       system("skyplot < SKYPLOT.CMD > /dev/null");
 
       # numerische Ausgabe von Skyplot einlesen und Anzahl Datenzeilen speichern
-      maxRec = daten_einlesen(resfile);
-      
-      # rekonstruieren der azimutalen Aufloesung in gon. Der minimal moegliche Wert betraegt offenbar 0.01375 gon.
-      # Damit die Darstellung trotzdem korrekt erstellt wird, wenn ein kleinerer Wert eingegeben wird,
-      # muss die tatsaechliche azimutale Aufloesung nachtraeglich aus der numerischen Ausgabe rekonstruiert werden.
-      aufloesAziCalc = oeffWink / (maxRec - 1);
+      maxRec = datenEinlesen(resfile);
 
       # am linken Bildrand beginnen
       abstX = 0;
@@ -282,9 +273,9 @@ BEGIN {
             if (xy == bisherigePte[k])
               existiert = 1;
           if (existiert == 0) {
-		    dist0 = ankathete_aus_hypotenuse_und_winkel(distanz[j], hoehenwinkel[j])
+		    dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
 			# Bestimmen der Lagekoordinaten jedes Punktes
-		    if (split(bestimme_xy(x, y, dist0, azi[j]), xyPt, " ") == -1)
+		    if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
               abbruch("\nungueltiges Azimut.");
             printf("%7.3f, %7.3f, %9.1f, %9.1f, %8.1f, %5.1f, %5.1f, %6d, %5d\n", abstX, abstY, xyPt[1], xyPt[2], distanz[j], azi[j], hoehenwinkel[j], i, round((i - minDist) / distRel)) > panofile;
           }
@@ -330,25 +321,25 @@ function abbruch(info) {
   exit;
 }
 
-##### bestimme_xy #####
+##### bestimmeXY #####
 # Berechnet aus dem Standort (X und Y Koordinaten) sowie der Distanz und Azimut die X/Y-Koordinaten des
 # anvisierten Punktes. Dabei wird der Vollkreis in 8 Sektoren zu je 50 gon aufgeteilt.
 # Die Distanz bildet die Hypotenuse (c), das Azimut wird in den Winkel Alpha oder Beta umgerechnet.
 # Zurueckgeliefert werden X und Y Koordinaten als Leerzeichen-getrennter String.
 # bei einem ungueltigen Azimut (< 0 oder > 400) wird -1 zurueckgegeben
-function bestimme_xy(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
+function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
   if (aziGon == 0)
     return x " " y + dist;
   else if (aziGon > 0 && aziGon < 50) {
-    a = gegenkathete_aus_hypotenuse_und_winkel(dist, aziGon);
+    a = gegenkatheteAusHypotenuseUndWinkel(dist, aziGon);
     xE = x + a;
-    yE = y + ankathete_aus_gegenkathete_und_winkel(a, aziGon);
+    yE = y + ankatheteAusGegenkatheteUndWinkel(a, aziGon);
     return xE " " yE;
   }
   else if (aziGon >= 50 && aziGon < 100) {
     beta = 100 - aziGon;
-    b = gegenkathete_aus_hypotenuse_und_winkel(dist, beta);
-    xE = x + ankathete_aus_gegenkathete_und_winkel(b, beta);
+    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
+    xE = x + ankatheteAusGegenkatheteUndWinkel(b, beta);
     yE = y + b;
     return xE " " yE;
   }
@@ -356,31 +347,31 @@ function bestimme_xy(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
     return x + dist " " y;
   else if (aziGon > 100 && aziGon < 150) {
     alpha = aziGon - 100;
-    a = gegenkathete_aus_hypotenuse_und_winkel(dist, alpha);
-    xE = x + ankathete_aus_gegenkathete_und_winkel(a, alpha);
+    a = gegenkatheteAusHypotenuseUndWinkel(dist, alpha);
+    xE = x + ankatheteAusGegenkatheteUndWinkel(a, alpha);
     yE = y - a;
     return xE " " yE;
    }
   else if (aziGon >= 150 && aziGon < 200) {
     beta = 200 - aziGon;
-    b = gegenkathete_aus_hypotenuse_und_winkel(dist, beta);
+    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
     xE = x + b;
-    yE = y - ankathete_aus_gegenkathete_und_winkel(b, beta);
+    yE = y - ankatheteAusGegenkatheteUndWinkel(b, beta);
     return xE " " yE;
   }
   else if (aziGon == 200)
     return x " " y - dist;
   else if (aziGon > 200 && aziGon < 250) {
     alpha = aziGon - 200;
-    a = gegenkathete_aus_hypotenuse_und_winkel(dist, alpha);
+    a = gegenkatheteAusHypotenuseUndWinkel(dist, alpha);
     xE = x - a;
-    yE = y - ankathete_aus_gegenkathete_und_winkel(a, alpha);
+    yE = y - ankatheteAusGegenkatheteUndWinkel(a, alpha);
     return xE " " yE;
   }
   else if (aziGon >= 250 && aziGon < 300) {
     beta = 300 - aziGon;
-    b = gegenkathete_aus_hypotenuse_und_winkel(dist, beta);
-    xE = x - ankathete_aus_gegenkathete_und_winkel(b, beta);
+    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
+    xE = x - ankatheteAusGegenkatheteUndWinkel(b, beta);
     yE = y - b;
     return xE " " yE;
   }
@@ -388,30 +379,31 @@ function bestimme_xy(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
     return x - dist " " y;
   else if (aziGon > 300 && aziGon < 350) {
     alpha = aziGon - 300;
-    a = gegenkathete_aus_hypotenuse_und_winkel(dist, alpha);
-    xE = x - ankathete_aus_gegenkathete_und_winkel(a, alpha);
+    a = gegenkatheteAusHypotenuseUndWinkel(dist, alpha);
+    xE = x - ankatheteAusGegenkatheteUndWinkel(a, alpha);
     yE = y + a;
     return xE " " yE;
   }
   else if (aziGon >= 350 && aziGon < 400) {
     beta = 400 - aziGon;
-    b = gegenkathete_aus_hypotenuse_und_winkel(dist, beta);
+    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
     xE = x - b;
-    yE = y + ankathete_aus_gegenkathete_und_winkel(b, beta);
+    yE = y + ankatheteAusGegenkatheteUndWinkel(b, beta);
     return xE " " yE;
   }
   else
     return dist = -1;
 }
 
-##### daten_einlesen #####
+
+##### datenEinlesen #####
 # einlesen der numerischen Ausgabe von Skyplot
 # nur Datenzeilen beruecksichtigen (solche, die mit Zahlen beginnen)
 # aus den 3 Feldern die Arrays 'azi', 'hoehenwinkel' und 'distanz' bilden
 # die Felder muessen mit substr extrahiert werden, weil sie direkt aneinander grenzen
 # die Addition mit 0 erzwingt die Konvertierung in eine Zahl
 # Anzahl Datenzeilen zurueckliefern
-function daten_einlesen(resultfile,    i) {
+function datenEinlesen(resultfile,    i) {
   new(azi);
   new(hoehenwinkel);
   new(distanz);
@@ -451,6 +443,7 @@ function dhmBeschreibung(dhmTyp) {
 
 ##### dhmKopieren #####
 # Hoehenmodell ins Arbeitsverzeichnis kopieren
+# ln waere schneller, funktioniert aber bei Verwendung einer RAM-Disk nicht
 function dhmKopieren(dhmTyp, dhmName) {
   if (dhmTyp == "alti25")
     system("cp $SCOP_ROOT/swissalti/swissalti25.dtm " dhmName);
@@ -476,21 +469,21 @@ function dhmKopieren(dhmTyp, dhmName) {
 # bei einem ungueltigen Azimut (< 0 oder > 400) wird -1 zurueckgegeben
 function distGre(haelfteMittelsenkr, aziGon,    dist) {
   if (aziGon >=0 && aziGon < 50)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, aziGon);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon);
   else if (aziGon >= 50 && aziGon < 100)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, 100 - aziGon);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 100 - aziGon);
   else if (aziGon >= 100 && aziGon < 150)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, aziGon - 100);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon - 100);
   else if (aziGon >= 150 && aziGon < 200)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, 200 - aziGon);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 200 - aziGon);
   else if (aziGon >= 200 && aziGon < 250)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, aziGon - 200);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon - 200);
   else if (aziGon >= 250 && aziGon < 300)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, 300 - aziGon);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 300 - aziGon);
   else if (aziGon >= 300 && aziGon < 350)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, aziGon - 300);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon - 300);
   else if (aziGon >= 350 && aziGon < 400)
-    return dist = hypotenuse_aus_ankathete_und_winkel(haelfteMittelsenkr, 400 - aziGon);
+    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 400 - aziGon);
   else
     return dist = -1;
 }
@@ -506,10 +499,44 @@ function ekrref(distanz,    k, erdRad) {
   return (1 - k) * distanz^2 / (2 * erdRad);
 }
 
-##### hoehe_aus_distanz_und_winkel #####
+##### extrempunkteNESW #####
+# bestimmt die Extrempunkte Nord, Ost, Sued und West ausgehend vom aktuell prozessierten Punkt
+# und uebertraegt zusaetzliche Informationen
+function extrempunkteNESW(xAkt, yAkt, azi, dist, hwink) {
+  if (yAkt > exNord["y"]) {
+    exNord["x"] = xAkt;
+    exNord["y"] = yAkt;
+    exNord["Azi"] = azi;
+    exNord["Distanz"] = dist;
+    exNord["Hoehenwinkel"] = hwink;
+  }
+  if (xAkt > exOst["x"]) {
+    exOst["x"] = xAkt;
+    exOst["y"] = yAkt;
+    exOst["Azi"] = azi;
+    exOst["Distanz"] = dist;
+    exOst["Hoehenwinkel"] = hwink;
+  }
+  if (yAkt < exSued["y"]) {
+    exSued["x"] = xAkt;
+    exSued["y"] = yAkt;
+    exSued["Azi"] = azi;
+    exSued["Distanz"] = dist;
+    exSued["Hoehenwinkel"] = hwink;
+  }
+  if (xAkt < exWest["x"]) {
+    exWest["x"] = xAkt;
+    exWest["y"] = yAkt;
+    exWest["Azi"] = azi;
+    exWest["Distanz"] = dist;
+    exWest["Hoehenwinkel"] = hwink;
+  }
+}
+
+##### hoeheAusDistanzUndWinkel #####
 # berechnet die Hoehe eines Punktes, der durch Distanz und Hoehenwinkel von einer bekannten Hoehe definiert ist
-function hoehe_aus_distanz_und_winkel(z, distanz, hoehenwinkel,    hoehe) {
-  hoehe = gegenkathete_aus_hypotenuse_und_winkel(distanz, hoehenwinkel);
+function hoeheAusDistanzUndWinkel(z, distanz, hoehenwinkel,    hoehe) {
+  hoehe = gegenkatheteAusHypotenuseUndWinkel(distanz, hoehenwinkel);
   hoehe = hoehe + ekrref(distanz);
   return hoehe = hoehe + z;
 }
@@ -552,7 +579,7 @@ function prot(protfile) {
   printf("Berechnungsdatum: %s\n", strftime("%a. %d. %B %Y", systime()))                   > protfile;
   printf("Berechnet von   : %s\n\n\n", username())                                         > protfile;
   printf("%s\n", rep(90, "*"))                                                             > protfile;
-  printf("Berechnungsprotokoll SKY-SIL %s\n", name)                                        > protfile;
+  printf("Berechnungsprotokoll skyplot2pano v%s, %s\n", version, name)                       > protfile;
   printf("%s\n", rep(90, "*"))                                                             > protfile;
   printf("\n\nEingabe\n")                                                                  > protfile;
   printf("%s\n\n", rep(7, "*"))                                                            > protfile;
@@ -572,8 +599,8 @@ function prot(protfile) {
   printf("Interpolierte Hoehe im %-13s:  %.1f m\n", toupper(dhm), mhoehe)                  > protfile;
   printf("Differenz                           :  %.1f m\n", z - mhoehe)                    > protfile;
   printf("Oeffnungswinkel                     :  %d gon\n", aziRe - aziLi)                 > protfile;
-  printf("Radius                              :  %.3f mm\n", radPr)                        > protfile;
-  printf("Azimutale Aufloesung in Skyplot     :  %.5f gon\n", aufloesAziCalc)              > protfile;
+  printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                        > protfile;
+  printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)              > protfile;
   printf("Anzahl Berechnungen                 :  %d\n", (maxDist - minDist) / aufloesDist) > protfile;
   printf("\n\n\nTopographische Extrempunkte\n")                                            > protfile;
   printf("%s\n\n", rep(27, "*"))                                                           > protfile;
@@ -589,6 +616,8 @@ function prot(protfile) {
     exSued["x"], exSued["y"], exSued["z"], exSued["Distanz"] / 1000, exSued["Azi"], ekrref(exSued["Distanz"]), exSued["z"] - z) > protfile;
   printf("Westlichster:  %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
     exWest["x"], exWest["y"], exWest["z"], exWest["Distanz"] / 1000, exWest["Azi"], ekrref(exWest["Distanz"]), exWest["z"] - z) > protfile;
+  printf("Hoechster:     %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
+    xyHoe[1], xyHoe[2], exHoe["z"], exHoe["Distanz"] / 1000, exHoe["Azi"], ekrref(exHoe["Distanz"]), exHoe["z"] - z)     > protfile;
   printf("Entferntester: %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
     xyEntf[1], xyEntf[2], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z)     > protfile;
 }
@@ -681,19 +710,19 @@ function gon2rad(gon) {
   return pi() / (400 / 2) * gon;
 }
 
-function ankathete_aus_hypotenuse_und_winkel(c, winkelGon) {
+function ankatheteAusHypotenuseUndWinkel(c, winkelGon) {
   return c * sin(gon2rad(100 - winkelGon));
 }
 
-function gegenkathete_aus_hypotenuse_und_winkel(c, winkelGon) {
+function gegenkatheteAusHypotenuseUndWinkel(c, winkelGon) {
   return c * sin(gon2rad(winkelGon));
 }
 
-function ankathete_aus_gegenkathete_und_winkel(a, winkelGon) {
+function ankatheteAusGegenkatheteUndWinkel(a, winkelGon) {
   return a / tan(gon2rad(winkelGon));
 }
 
-function hypotenuse_aus_ankathete_und_winkel(b, winkelGon) {
+function hypotenuseAusAnkatheteUndWinkel(b, winkelGon) {
   return b / cos(gon2rad(winkelGon));
 }
 
