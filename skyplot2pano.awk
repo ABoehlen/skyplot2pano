@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         28.03.2024
-# Version:      1.2
+# Date:         30.03.2024
+# Version:      1.3
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten,
 #               nach Distanz abgestuften "Silhouettenlinien"
@@ -30,7 +30,14 @@ BEGIN {
   }
   else {
     ##### vorbereiten #####
-	version = 1.2;
+	
+	# diverse Variablen initialisieren
+    version = 1.3;
+	formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
+	formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
+	formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
+	formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
+	
     # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
     x = ARGV[1];
     y = ARGV[2];
@@ -102,7 +109,7 @@ BEGIN {
 
     # Panoramadatei vorbereiten
     panofile = "sil_" name "_" aziLi "-" aziRe ".txt"
-    printf("%7s, %7s, %9s, %9s, %8s, %5s, %5s, %6s, %5s\n", "X", "Y", "LageX", "LageY", "Dist", "Azi", "HWink", "Limit", "DiRel") > panofile;
+    printf(formatSilTxt, "X", "Y", "LageX", "LageY", "LageZ", "Dist", "Azi", "HWink", "Limit", "DiRel") > panofile;
 
     # aus 'maxDist' einen relativen Wert ableiten, um spaeter die einzelnen Punkte den Werten 0 bis 10
     # zuzuweisen (0 = naheliegendst, 10 = entferntest)
@@ -115,16 +122,16 @@ BEGIN {
     
     # Arrays zur Speicherung der Extrempunkte initialisieren
     exEntf["Distanz"] = 0;
-	exHoe["z"] = 0;
+    exHoe["z"] = 0;
     exNord["x"] = exOst["x"] = exSued["x"] = exWest["x"] = x;
     exNord["y"] = exOst["y"] = exSued["y"] = exWest["y"] = y;
 
     # Theoretische Aussichtsweite ermitteln
     maxSicht = theoausweit(z);
-	
-	# bei geringer theoretischen Aussichtsweite (niedriges Projektionszentrum) den Wert auf 100 km festlegen 
-	if (maxSicht < 100000)
-	  maxSicht = 100000;
+
+    # bei geringer theoretischen Aussichtsweite (niedriges Projektionszentrum) den Wert auf 100 km festlegen 
+    if (maxSicht < 100000)
+      maxSicht = 100000;
 
     # SCOP LIMITS im Abstand des doppelten zuvor ermittelten Wertes festlegen
     N = maxDists(x, y, (maxSicht * 2), "N");
@@ -147,7 +154,7 @@ BEGIN {
     maxRec = datenEinlesen(resfile);
 
     # rekonstruieren der azimutalen Aufloesung in gon. Die azimutale Aufloesung kann nicht beliebig klein sein
-	# und haengt vom Oeffnungswinkel ab.
+    # und haengt vom Oeffnungswinkel ab.
     # Damit die Darstellung auch dann korrekt erstellt wird, wenn ein zu kleiner Wert eingegeben wird,
     # muss die tatsaechliche azimutale Aufloesung nachtraeglich aus der numerischen Ausgabe rekonstruiert werden.
     aufloesAziCalc = oeffWink / (maxRec - 1);
@@ -167,7 +174,7 @@ BEGIN {
 
       hoehe = hoeheAusDistanzUndWinkel(z, distanz[i], hoehenwinkel[i]);
       if (hoehe > exHoe["z"]) {
-	    exHoe["z"] = hoehe;
+        exHoe["z"] = hoehe;
         exHoe["Azi"] = azi[i];
         exHoe["Distanz"] = distanz[i];
         exHoe["Hoehenwinkel"] = hoehenwinkel[i];
@@ -182,12 +189,12 @@ BEGIN {
       if (xyAkt[1] == -1)
         abbruch("\nungueltiges Azimut.");
       else
-	    extrempunkteNESW(xyAkt[1], xyAkt[2], azi[i], distanz[i], hoehenwinkel[i]);
+        extrempunkteNESW(xyAkt[1], xyAkt[2], azi[i], distanz[i], hoehenwinkel[i]);
 
     }
-	
-	# Z Koordinate der Extrempunkte N, E, S, W bestimmen
-	exNord["z"] = hoeheAusDistanzUndWinkel(z, exNord["Distanz"], exNord["Hoehenwinkel"]);
+
+    # Z Koordinate der Extrempunkte N, E, S, W bestimmen
+    exNord["z"] = hoeheAusDistanzUndWinkel(z, exNord["Distanz"], exNord["Hoehenwinkel"]);
     exOst["z"] =  hoeheAusDistanzUndWinkel(z, exOst["Distanz"],  exOst["Hoehenwinkel"]);
     exSued["z"] = hoeheAusDistanzUndWinkel(z, exSued["Distanz"], exSued["Hoehenwinkel"]);
     exWest["z"] = hoeheAusDistanzUndWinkel(z, exWest["Distanz"], exWest["Hoehenwinkel"]);
@@ -273,11 +280,13 @@ BEGIN {
             if (xy == bisherigePte[k])
               existiert = 1;
           if (existiert == 0) {
-		    dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
-			# Bestimmen der Lagekoordinaten jedes Punktes
-		    if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
+            dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
+            # Bestimmen der Lagekoordinaten jedes Punktes
+            if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
               abbruch("\nungueltiges Azimut.");
-            printf("%7.3f, %7.3f, %9.1f, %9.1f, %8.1f, %5.1f, %5.1f, %6d, %5d\n", abstX, abstY, xyPt[1], xyPt[2], distanz[j], azi[j], hoehenwinkel[j], i, round((i - minDist) / distRel)) > panofile;
+            # Bestimmen der Hoehe jedes Punktes
+            xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
+            printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], distanz[j], azi[j], hoehenwinkel[j], i, round((i - minDist) / distRel)) > panofile;
           }
           else
             existiert = 0;
@@ -294,7 +303,7 @@ BEGIN {
 
     ##### Berechnungsprotokoll erstellen #####
     protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
-    prot(protokoll);
+    prot(protokoll, version, name, x, y, z, aziLi, aziRe, aufloesAzi, bildbr, dhm, minDist, maxDist, aufloesDist, mhoehe, radPr, aufloesAziCalc, formatProtTxt, formatProtDat);
 
     ##### aufraeumen und beenden #####
     system("rm -f SKYPLOT.CMD");
@@ -575,11 +584,11 @@ function new(array) {
 
 ##### prot #####
 # erzeugt Berechnungsprotokoll
-function prot(protfile) {
-  printf("Berechnungsdatum: %s\n", strftime("%a. %d. %B %Y", systime()))                   > protfile;
-  printf("Berechnet von   : %s\n\n\n", username())                                         > protfile;
+function prot(protfile, version, name, x, y, z, aziLi, aziRe, aufloesAzi, bildbr, dhm, minDist, maxDist, aufloesDist, mhoehe, radPr, aufloesAziCalc, formatProtTxt, formatProtDat) {
+  printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))           > protfile;
+  printf("Berechnet von: %s\n\n\n", username())                                            > protfile;
   printf("%s\n", rep(90, "*"))                                                             > protfile;
-  printf("Berechnungsprotokoll skyplot2pano v%s, %s\n", version, name)                       > protfile;
+  printf("Berechnungsprotokoll skyplot2pano v%s, %s\n", version, name)                     > protfile;
   printf("%s\n", rep(90, "*"))                                                             > protfile;
   printf("\n\nEingabe\n")                                                                  > protfile;
   printf("%s\n\n", rep(7, "*"))                                                            > protfile;
@@ -604,21 +613,21 @@ function prot(protfile) {
   printf("Anzahl Berechnungen                 :  %d\n", (maxDist - minDist) / aufloesDist) > protfile;
   printf("\n\n\nTopographische Extrempunkte\n")                                            > protfile;
   printf("%s\n\n", rep(27, "*"))                                                           > protfile;
-  printf("Extrempunkt    %-8s%-8s%-6s%-7s%-10s%-8s%-6s\n",\
+  printf("Extrempunkt    " formatProtTxt,\
     "X", "Y", "Z", "D [km]", "Azi [gon]", "E-R [m]", "dH [m]")                             > protfile;
   printf("%s\n", rep(68, "-"))                                                             > protfile;
 
-  printf("Noerdlichster: %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
+  printf("Noerdlichster: " formatProtDat,\
     exNord["x"], exNord["y"], exNord["z"], exNord["Distanz"] / 1000, exNord["Azi"], ekrref(exNord["Distanz"]), exNord["z"] - z) > protfile;
-  printf("Oestlichster:  %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
+  printf("Oestlichster:  " formatProtDat,\
     exOst["x"], exOst["y"], exOst["z"], exOst["Distanz"] / 1000, exOst["Azi"], ekrref(exOst["Distanz"]), exOst["z"] - z)        > protfile;
-  printf("Suedlichster:  %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
+  printf("Suedlichster:  " formatProtDat,\
     exSued["x"], exSued["y"], exSued["z"], exSued["Distanz"] / 1000, exSued["Azi"], ekrref(exSued["Distanz"]), exSued["z"] - z) > protfile;
-  printf("Westlichster:  %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
+  printf("Westlichster:  " formatProtDat,\
     exWest["x"], exWest["y"], exWest["z"], exWest["Distanz"] / 1000, exWest["Azi"], ekrref(exWest["Distanz"]), exWest["z"] - z) > protfile;
-  printf("Hoechster:     %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
-    xyHoe[1], xyHoe[2], exHoe["z"], exHoe["Distanz"] / 1000, exHoe["Azi"], ekrref(exHoe["Distanz"]), exHoe["z"] - z)     > protfile;
-  printf("Entferntester: %-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n",\
+  printf("Hoechster:     " formatProtDat,\
+    xyHoe[1], xyHoe[2], exHoe["z"], exHoe["Distanz"] / 1000, exHoe["Azi"], ekrref(exHoe["Distanz"]), exHoe["z"] - z)            > protfile;
+  printf("Entferntester: " formatProtDat,\
     xyEntf[1], xyEntf[2], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z)     > protfile;
 }
 
