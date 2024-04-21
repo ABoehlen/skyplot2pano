@@ -2,7 +2,8 @@
 
 ## Purpose
 skyplot2pano is a program written in AWK which uses the function of SCOP.SKYPLOT of the TU Wien (Vienna University of Technology) from 1999 for the calculation of panoramas with silhouettes and the determination of visibility parameters. SCOP.SKYPLOT is a small utility programme of the SCOP programme system.
-The results of skyplot2pano are two text files: The prot file is the log containing the given arguments and various derived information. The sil file is a comma-separated text file that can be visualized by a geographic information system (e.g. ArcGIS, QGIS...) using the X and Y fields. The DiRel field can be used to symbolise the points. The nearest points have the value 0, the furthest points the values 8 or 9. Using the calculated position coordinates, it is possible to localize the displayed peaks.
+The results of skyplot2pano are in general two text files: The prot file is the log containing the given arguments and various derived information. The sil file is a comma-separated text file that can be visualized by a geographic information system (e.g. ArcGIS, QGIS...) using the X and Y fields. The DiRel field can be used to symbolise the points. The nearest points have the value 0, the furthest points the values 8 or 9. Using the calculated position coordinates, it is possible to localize the displayed peaks.
+Using additional arguments, a predefined name file can be included in the calculation and the panoramic image can be supplemented with mountain names and assignment lines in this way. This information is prepared as a DXF file, whereby the naming convention corresponds to the prot and sil file.
 
 ## Background
 
@@ -17,7 +18,7 @@ Download the repository into your desired directory:
 ```
 cd <directory>
 git clone https://github.com/ABoehlen/skyplot2pano
-cd grid2mlt
+cd skyplot2pano
 ```
 
 Then you just type…
@@ -29,7 +30,7 @@ Then you just type…
 …for getting the usage:
 
 ```
-Usage: skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufloes-Azi> <Azi links> <Azi rechts> <Bildbreite> <Min-Dist> <Max-Dist> <Aufloes-Dist>
+Usage: skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufloes-Azi> <Azi links> <Azi rechts> <Bildbreite> <Min-Dist> <Max-Dist> <Aufloes-Dist> <Nam> <Tol>
 ```
 
 ## Usage
@@ -38,7 +39,7 @@ The meanings of the various arguments are described in the usage (in German). Fo
 
 ## Test file
 
-You can use the enclosed file dhm1000.dtm for test purposes. This is a version of the DHM25 digital elevation model with a 1000 m grid. 
+You can use the enclosed file dhm1000.dtm for testing purposes. This is a version of the DHM25 digital elevation model with a 1000 m grid. 
 
 Reference:  
 Federal Office of Topography swisstopo  

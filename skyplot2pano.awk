@@ -1,43 +1,54 @@
 #!/usr/bin/awk -f
-######################################################################################################################################################
+#########################################################################################################################################################
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         30.03.2024
-# Version:      1.3
+# Date:         21.04.2024
+# Version:      1.7
 #
-# Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten,
-#               nach Distanz abgestuften "Silhouettenlinien"
+# Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               Berechnung von Sichtbarkeitskennwerten
+#               Beschriftung der dargestellten Punkte anhand einer Namendatei
 #               Eingegebene und abgeleitete Parameter werden in ein Protokoll geschrieben
 #
 # Requirements: - das Programm verwendet UNIX-Kommandos, muss also wenn unter Windows betrieben, in einem UNIX-Emulator ausgefuehrt werden
 #               - die zu verwendenden Hoehenmodelle muessen im Format SCOP RDH vorliegen
 #               - der Speicherort der verwendeten Hoehenmodelle muss in der Funktion 'dhmKopieren' festgelegt werden
 #               - die Aufrufparameter der verwendeten Hoehenmodelle sind in der Funktion 'dhmBeschreibung' festzulegen
+#               - der Speicherort der verwendeten Namensfiles muss in der Funktion 'namKopieren' festgelegt werden
+#               - die Aufrufparameter der verwendeten Namensfiles sind in der Funktion 'namBeschreibung' festzulegen
+#               - die verwendeten Namensfiles muessen im gleich strukturierten Textformat vorliegen wie fuer die Benutzung mit SCOP.PER
 #               - das SCOP Utility Programm skyplot.exe muss vorhanden und über den Befehl 'skyplot' aufrufbar sein
 #
-# Usage:        skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufloes-Azi> <Azi links> <Azi rechts> <Bildbreite> <Min-Dist> <Max-Dist> <Aufloes-Dist>
+# Usage:        skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufl-Azi> <Azi li> <Azi re> <Bildbr> <Min-Dist> <Max-Dist> <Aufloes-Dist> <Nam> <Tol>
 #
-######################################################################################################################################################
+#########################################################################################################################################################
 
 BEGIN {
 
+  # Field Separator auf "," stellen, zwecks Einlesen des temporaer erzeugten Namensfiles
+  FS = ",";
+
   # Usage ausgeben, wenn zuwenig Argumente
-  if (ARGC < 13) { 
+  if (ARGC < 15) { 
     usage();
     exit;
   }
   else {
     ##### vorbereiten #####
-	
-	# diverse Variablen initialisieren
-    version = 1.3;
-	formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
-	formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
-	formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
-	formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
-	
+
+    # diverse Variablen initialisieren
+    version = 1.7;
+    formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
+    formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
+    formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
+    formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
+    formatNamTmp = "%s, %d, %d, %d, %d\n";
+    minX = 0;
+    maxX = 0;
+    minY = 0;
+    maxY = 0;
+
     # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
     x = ARGV[1];
     y = ARGV[2];
@@ -58,6 +69,15 @@ BEGIN {
     aufloesDist = ARGV[12] * 1000;
     aufloesDist = round(aufloesDist);
 
+    # Namendatenfile kopieren falls gewuenscht
+    namFile = ARGV[13];
+    if (namFile != "0") {
+      namFile = namFile ".txt";
+      namKopieren(namFile);
+    }
+    toleranz = ARGV[14];
+    toleranz = round(toleranz);
+
     # Array zuruecksetzen, damit Argumente nicht als Files interpretiert werden
     ARGV[1] = "";
     ARGV[2] = "";
@@ -71,9 +91,11 @@ BEGIN {
     ARGV[10] = "";
     ARGV[11] = "";
     ARGV[12] = "";
+    ARGV[13] = "";
+    ARGV[14] = "";
 
     # Usage ausgeben, wenn zuviele Argumente
-    if (ARGV[13] != "") {
+    if (ARGV[15] != "") {
       usage();
       exit;
     }
@@ -110,6 +132,12 @@ BEGIN {
     # Panoramadatei vorbereiten
     panofile = "sil_" name "_" aziLi "-" aziRe ".txt"
     printf(formatSilTxt, "X", "Y", "LageX", "LageY", "LageZ", "Dist", "Azi", "HWink", "Limit", "DiRel") > panofile;
+
+    # Namen-Ausgabedateien vorbereiten
+    if (namFile != "0") {
+      namTmpFile = "namTmp.txt"
+      namDXFfile = "nam_" name "_" aziLi "-" aziRe ".dxf"
+    }
 
     # aus 'maxDist' einen relativen Wert ableiten, um spaeter die einzelnen Punkte den Werten 0 bis 10
     # zuzuweisen (0 = naheliegendst, 10 = entferntest)
@@ -151,7 +179,7 @@ BEGIN {
     mhoehe = modellhoehe(resfile);
 
     # numerische Ausgabe von Skyplot einlesen
-    maxRec = datenEinlesen(resfile);
+    maxRec = skyplotEinlesen(resfile);
 
     # rekonstruieren der azimutalen Aufloesung in gon. Die azimutale Aufloesung kann nicht beliebig klein sein
     # und haengt vom Oeffnungswinkel ab.
@@ -218,9 +246,15 @@ BEGIN {
     ####### 2. Teil: Panorama berechnen #######
     ###########################################
 
-    # Variablen zum Speichern der Punkte einrichten
+    # Variablen zum Speichern der Punkte und Namen einrichten
     new(bisherigePte);
-    existiert = 0;
+    new(bisherigeNamen);
+    existiertPkt = 0;
+    existiertNam = 0;
+
+    # Namendaten einlesen, wenn spezifiziert
+    if (namFile != "0")
+      anzNam = namEinlesen(namFile);
 
     # um fehlerhafte Resultate zu vermeiden, muss der unmittelbare Nahbereich unterdrueckt werden
     if (minDist < 500)
@@ -244,7 +278,7 @@ BEGIN {
       system("skyplot < SKYPLOT.CMD > /dev/null");
 
       # numerische Ausgabe von Skyplot einlesen und Anzahl Datenzeilen speichern
-      maxRec = datenEinlesen(resfile);
+      maxRec = skyplotEinlesen(resfile);
 
       # am linken Bildrand beginnen
       abstX = 0;
@@ -272,25 +306,57 @@ BEGIN {
         }
         # andernfalls wird geprueft, ob an der betreffenden Stelle von einer vorherigen Berechnung bereits ein Punkt
         # vorhanden ist. Falls nicht, wird er in die Ausgabedatei geschrieben.
-        # Die X-Koordinate wird in jedem Fall um einen Schritt erhoeht.
+        # Die X-Bildkoordinate wird in jedem Fall um einen Schritt erhoeht.
         else {
           abstY = radPr * tan(gon2rad(hoehenwinkel[j]));
-          xy = abstX abstY; # X und Y Koordinate als String konkatenieren
+          xy = abstX abstY; # X und Y Bildkoordinate als String konkatenieren
           for (k in bisherigePte)
             if (xy == bisherigePte[k])
-              existiert = 1;
-          if (existiert == 0) {
+              existiertPkt = 1;
+          if (existiertPkt == 0) {
             dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
             # Bestimmen der Lagekoordinaten jedes Punktes
             if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
               abbruch("\nungueltiges Azimut.");
             # Bestimmen der Hoehe jedes Punktes
             xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
+            # Punkt in Panoramadatei schreiben
             printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], distanz[j], azi[j], hoehenwinkel[j], i, round((i - minDist) / distRel)) > panofile;
+            # minimale und maximale Bildkoordinaten ermitteln
+            if (abstX < minX)
+              minX = abstX;
+            if (abstX > maxX)
+              maxX = abstX;
+            if (abstY < minY)
+              minY = abstY;
+            if (abstY > maxY)
+              maxY = abstY;
+            
+            # Falls ein Namensfile definiert wurde, pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen
+            # und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
+            if (namFile != "0") {
+              for (nam = 1; nam <= anzNam; nam++) {
+                # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten suchen
+                if ((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) {
+                  if ((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) {
+                    nameHoehe = namName[nam] namZ[nam]; # Name und Hoehe als String konkatenieren, zwecks Eindeutigkeit
+                    for (m in bisherigeNamen)
+                      if (nameHoehe == bisherigeNamen[m])
+                        existiertNam = 1;
+                    # Name mit relevanten Informationen in temporaere Textdatei schreiben, sofern nicht bereits vorhanden
+                    if (existiertNam == 0)
+                      printf(formatNamTmp, namName[nam], namZ[nam], distanz[j], abstX, abstY) > namTmpFile;
+                    else
+                      existiertNam = 0;
+                    bisherigeNamen[m] = nameHoehe; # aktueller Name ins Array eintragen
+                  }
+                }
+              }
+            }
           }
           else
-            existiert = 0;
-          bisherigePte[j] = xy; # aktueller Punkt ins Array ergaenzen
+            existiertPkt = 0;
+          bisherigePte[j] = xy; # aktueller Punkt ins Array eintragen
           abstX = abstX + (gonInMM * aufloesAziCalc);
         }
       }
@@ -300,10 +366,37 @@ BEGIN {
     }
 
     close(panofile);
+    close(namTmpFile);
+
+    ###########################################
+    ###### 3. Teil: Namen-DXF erstellen #######
+    ###########################################
+
+    if (namFile != "0") {
+
+      # Namen-Ergebnisfile der Panoramaberechnung einlesen
+      anzNam = namTmpEinlesen(namTmpFile);
+
+      # DXF aufbauen
+      dxfHeader(namDXFfile, minX, minY, maxX, maxY);
+      dxfLinienBeginn(namDXFfile);
+
+      for (i = 1; i <= anzNam; i++)
+        dxfLinienInhalt(namDXFfile, namX[i], namY[i], maxY);
+      for (i = 1; i <= anzNam; i++)
+        dxfText(namDXFfile, namName[i], namX[i], maxY, namZ[i], namD[i]);
+
+      dxfAbschluss(namDXFfile);
+    }
+
+
+    ###########################################
+    ########### 4. Teil: Abschluss ############
+    ###########################################
 
     ##### Berechnungsprotokoll erstellen #####
     protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
-    prot(protokoll, version, name, x, y, z, aziLi, aziRe, aufloesAzi, bildbr, dhm, minDist, maxDist, aufloesDist, mhoehe, radPr, aufloesAziCalc, formatProtTxt, formatProtDat);
+    prot(protokoll);
 
     ##### aufraeumen und beenden #####
     system("rm -f SKYPLOT.CMD");
@@ -312,8 +405,13 @@ BEGIN {
     system("rm -f SKYPLOT.RPT");
     system("rm -f sky.rdh");
 
+    if (namFile != "0") {
+      system("rm -f " namFile);
+      system("rm -f " namTmpFile);
+    }
+
     # um Awk zu zwingen, das Programm zu beenden, ohne Files zu lesen
-    if (ARGV[12] == "")
+    if (ARGV[14] == "")
       exit;
   }
 }
@@ -404,33 +502,6 @@ function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
     return dist = -1;
 }
 
-
-##### datenEinlesen #####
-# einlesen der numerischen Ausgabe von Skyplot
-# nur Datenzeilen beruecksichtigen (solche, die mit Zahlen beginnen)
-# aus den 3 Feldern die Arrays 'azi', 'hoehenwinkel' und 'distanz' bilden
-# die Felder muessen mit substr extrahiert werden, weil sie direkt aneinander grenzen
-# die Addition mit 0 erzwingt die Konvertierung in eine Zahl
-# Anzahl Datenzeilen zurueckliefern
-function datenEinlesen(resultfile,    i) {
-  new(azi);
-  new(hoehenwinkel);
-  new(distanz);
-  i = 0;
-  while ((getline < resultfile) > 0)
-    if ($1 ~ /^[1-9]/) {
-      i++;
-      azi[i] = substr($0, 1, 8);
-      azi[i] = azi[i] + 0;
-      hoehenwinkel[i] = substr($0, 9, 8);
-      hoehenwinkel[i] = hoehenwinkel[i] + 0;
-      distanz[i] = substr($0, 18, 8);
-      distanz[i] = distanz[i] + 0;
-    }
-  close(resultfile);
-  return i;
-}
-
 ##### dhmBeschreibung #####
 # Ausgeben des genauen Namens des angegebenen Hoehenmodells
 function dhmBeschreibung(dhmTyp) {
@@ -495,6 +566,140 @@ function distGre(haelfteMittelsenkr, aziGon,    dist) {
     return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 400 - aziGon);
   else
     return dist = -1;
+}
+
+##### dxfHeader #####
+# erzeugt den Header der DXF-Datei
+function dxfHeader(namDXFfile, minX, minY, maxX, maxY) {
+  printf("  0\n")             > namDXFfile;
+  printf("SECTION\n")         > namDXFfile;
+  printf("  2\n")             > namDXFfile;
+  printf("HEADER\n")          > namDXFfile;
+  printf("  9\n")             > namDXFfile;
+  printf("$ACADVER\n")        > namDXFfile;
+  printf("  1\n")             > namDXFfile;
+  printf("AC1009\n")          > namDXFfile;
+  printf("  9\n")             > namDXFfile;
+  printf("$INSBASE\n")        > namDXFfile;
+  printf(" 10\n")             > namDXFfile;
+  printf("0.0\n")             > namDXFfile;
+  printf(" 20\n")             > namDXFfile;
+  printf("0.0\n")             > namDXFfile;
+  printf(" 30\n")             > namDXFfile;
+  printf("0.0\n")             > namDXFfile;
+  printf("  9\n")             > namDXFfile;
+  printf("$EXTMIN\n")         > namDXFfile;
+  printf(" 10\n")             > namDXFfile;
+  printf("%.1f\n", minX)      > namDXFfile;
+  printf(" 20\n")             > namDXFfile;
+  printf("%.1f\n", minY)      > namDXFfile;
+  printf(" 30\n")             > namDXFfile;
+  printf("0.0\n")             > namDXFfile;
+  printf("  9\n")             > namDXFfile;
+  printf("$EXTMAX\n")         > namDXFfile;
+  printf(" 10\n")             > namDXFfile;
+  printf("%.1f\n", maxX)      > namDXFfile;
+  printf(" 20\n")             > namDXFfile;
+  printf("%.1f\n", maxY + 70) > namDXFfile;
+  printf(" 30\n")             > namDXFfile;
+  printf("0.0\n")             > namDXFfile;
+  printf("  9\n")             > namDXFfile;
+  printf("$TEXTSTYLE\n")      > namDXFfile;
+  printf("  7\n")             > namDXFfile;
+  printf("STANDARD\n")        > namDXFfile;
+  printf("  0\n")             > namDXFfile;
+  printf("ENDSEC\n")          > namDXFfile;
+  close(namDXFfile);
+}
+
+##### dxfLinienBeginn #####
+# erzeugt den Beginn der Linensektion der DXF-Datei
+function dxfLinienBeginn(namDXFfile) {
+  printf("  0\n")             >> namDXFfile;
+  printf("SECTION\n")         >> namDXFfile;
+  printf("  2\n")             >> namDXFfile;
+  printf("ENTITIES\n")        >> namDXFfile;
+  close(namDXFfile);
+}
+
+##### dxfLinienInhalt #####
+# erzeugt die Linien der DXF-Datei
+function dxfLinienInhalt(namDXFfile, x, y, maxY) {
+  printf("  0\n")                  >> namDXFfile;
+  printf("POLYLINE\n")             >> namDXFfile;
+  printf("  8\n")                  >> namDXFfile;
+  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  printf(" 66\n")                  >> namDXFfile;
+  printf("     1\n")               >> namDXFfile;
+  printf(" 10\n")                  >> namDXFfile;
+  printf("0.0\n")                  >> namDXFfile;
+  printf(" 20\n")                  >> namDXFfile;
+  printf("0.0\n")                  >> namDXFfile;
+  printf(" 30\n")                  >> namDXFfile;
+  printf("0.0\n")                  >> namDXFfile;
+  printf(" 70\n")                  >> namDXFfile;
+  printf("     0\n")               >> namDXFfile;
+  printf("  0\n")                  >> namDXFfile;
+  printf("VERTEX\n")               >> namDXFfile;
+  printf("  8\n")                  >> namDXFfile;
+  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  printf(" 66\n")                  >> namDXFfile;
+  printf("     1\n")               >> namDXFfile;
+  printf(" 10\n")                  >> namDXFfile;
+  printf("%.1f\n", x)              >> namDXFfile;
+  printf(" 20\n")                  >> namDXFfile;
+  printf("%.1f\n", maxY + 10)      >> namDXFfile;
+  printf(" 30\n")                  >> namDXFfile;
+  printf("0.0\n")                  >> namDXFfile;
+  printf("  0\n")                  >> namDXFfile;
+  printf("VERTEX\n")               >> namDXFfile;
+  printf("  8\n")                  >> namDXFfile;
+  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  printf(" 66\n")                  >> namDXFfile;
+  printf("     1\n")               >> namDXFfile;
+  printf(" 10\n")                  >> namDXFfile;
+  printf("%.1f\n", x)              >> namDXFfile;
+  printf(" 20\n")                  >> namDXFfile;
+  printf("%.1f\n", y + 0.5)        >> namDXFfile;
+  printf(" 30\n")                  >> namDXFfile;
+  printf("0.0\n")                  >> namDXFfile;
+  printf("  0\n")                  >> namDXFfile;
+  printf("SEQEND\n")               >> namDXFfile;
+  printf("  8\n")                  >> namDXFfile;
+  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  close(namDXFfile);
+}
+
+##### dxfText #####
+# erzeugt die Schriften der DXF-Datei
+function dxfText(namDXFfile, name, x, maxY, z, dist) {
+  printf("  0\n")                                    >> namDXFfile;
+  printf("TEXT\n")                                   >> namDXFfile;
+  printf("  8\n")                                    >> namDXFfile;
+  printf("BERGNAMEN\n")                              >> namDXFfile;
+  printf(" 10\n")                                    >> namDXFfile;
+  printf("%.1f\n", x)                                >> namDXFfile;
+  printf(" 20\n")                                    >> namDXFfile;
+  printf("%.1f\n", maxY + 12)                        >> namDXFfile;
+  printf(" 30\n")                                    >> namDXFfile;
+  printf("0.0\n")                                    >> namDXFfile;
+  printf(" 40\n")                                    >> namDXFfile;
+  printf("3\n")                                      >> namDXFfile;
+  printf(" 50\n")                                    >> namDXFfile;
+  printf("45\n")                                     >> namDXFfile;
+  printf("  1\n")                                    >> namDXFfile;
+  printf("%s  %d m / %.1f km\n", name, z, dist/1000) >> namDXFfile;
+  close(namDXFfile);
+}
+
+##### dxfAbschluss #####
+# beendet den Aufbau der DXF-Datei
+function dxfAbschluss(namDXFfile) {
+  printf("  0\n")       >> namDXFfile;
+  printf("ENDSEC\n")    >> namDXFfile;
+  printf("  0\n")       >> namDXFfile;
+  printf("EOF\n")       >> namDXFfile;
+  close(namDXFfile);
 }
 
 ##### ekrref #####
@@ -576,6 +781,92 @@ function modellhoehe(resultfile,    mh) {
   return mh;
 }
 
+##### namBeschreibung #####
+# Ausgeben des genauen Namens der angegebenen Namendatei
+function namBeschreibung(namTyp) {
+  if (namTyp == "sn200.txt")
+    return "swissTLM-Regio Names";
+  else if (namTyp == "sn500.txt")
+    return "DKM500 Namen";
+  else if (namTyp == "sn1000.txt")
+    return "DKM1000 Namen";
+  else if (namTyp == "sn10000.txt")
+    return "Benutzerdefinierte Namendatei";
+  else
+    abbruch("\nungueltige Namendatei.");
+}
+
+##### namEinlesen #####
+# einlesen des angegebenen Namensfiles
+# nur Datenzeilen beruecksichtigen (solche, die mit Zahlen beginnen)
+# aus den Namen und Koordinaten die Arrays 'namName', 'namX', 'namY' und 'namZ' bilden
+# die Felder muessen mit substr extrahiert werden, weil sie in einem fixen Kolonnenformat vorliegen
+# saemtliche Werte werden auf Ganzzahlen gerundet
+# Anzahl Datenzeilen zurueckliefern
+function namEinlesen(namensfile,    i) {
+  new(namName);
+  new(namX);
+  new(namY);
+  new(namZ);
+  i = 0;
+  while ((getline < namensfile) > 0) {
+    i++;
+    namName[i] = substr($0, 1, 32);
+    namX[i] = substr($0, 37, 8);
+    namX[i] = round(namX[i]);
+    namY[i] = substr($0, 49, 8);
+    namY[i] = round(namY[i]);
+    namZ[i] = substr($0, 63, 6);
+    namZ[i] = round(namZ[i]);
+  }
+  close(namensfile);
+  return i;
+}
+
+##### namTmpEinlesen #####
+# einlesen des temporaeren Namensfiles
+# nur Datenzeilen beruecksichtigen (solche, die mit Zahlen beginnen)
+# aus den Daten die Arrays 'namName', 'namZ', 'namD' (Entfernung) sowie 'namX' und 'namY' fuer die Bildkoordinaten bilden
+# Anzahl Datenzeilen zurueckliefern
+function namTmpEinlesen(namTmpFile,    i) {
+  new(namName);
+  new(namZ);
+  new(namD);
+  new(namX);
+  new(namY);
+  i = 0;
+  while ((getline < namTmpFile) > 0) {
+    i++;
+    gsub(/[ ]+$/,"",$1) # Leerzeichen am Ende entfernen
+    namName[i] = $1;
+    namZ[i] = $2;
+    namZ[i] = namZ[i] + 0;
+    namD[i] = $3;
+    namD[i] = namD[i] + 0;
+    namX[i] = $4;
+    namX[i] = namX[i] + 0;
+    namY[i] = $5;
+    namY[i] = namY[i] + 0;
+  }
+  close(namTmpFile);
+  return i;
+}
+
+##### namKopieren #####
+# Namensfile ins Arbeitsverzeichnis kopieren
+function namKopieren(namFile) {
+  if (namFile == "sn200.txt")
+    system("cp $SCOP_ROOT/scop/util/SWNA/sn200.txt .");
+  else if (namFile == "sn500.txt")
+    system("cp $SCOP_ROOT/scop/util/SWNA/sn500.txt .");
+  else if (namFile == "sn1000.txt")
+    system("cp $SCOP_ROOT/scop/util/SWNA/sn1000.txt .");
+  else if (namFile == "sn10000.txt")
+    system("cp $SCOP_ROOT/scop/util/SWNA/sn10000.txt .");
+  else
+    abbruch("\nungueltiges Hoehenmodell.");
+}
+
 ##### new #####
 # erzeugt ein neues, leeres Array oder loescht den Inhalt eines bestehenden
 function new(array) {
@@ -584,7 +875,7 @@ function new(array) {
 
 ##### prot #####
 # erzeugt Berechnungsprotokoll
-function prot(protfile, version, name, x, y, z, aziLi, aziRe, aufloesAzi, bildbr, dhm, minDist, maxDist, aufloesDist, mhoehe, radPr, aufloesAziCalc, formatProtTxt, formatProtDat) {
+function prot(protfile) {
   printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))           > protfile;
   printf("Berechnet von: %s\n\n\n", username())                                            > protfile;
   printf("%s\n", rep(90, "*"))                                                             > protfile;
@@ -599,6 +890,8 @@ function prot(protfile, version, name, x, y, z, aziLi, aziRe, aufloesAzi, bildbr
   printf("Azimutale Aufloesung                :  %.3f gon\n", aufloesAzi)                  > protfile;
   printf("Bildbreite                          :  %d mm\n", bildbr)                         > protfile;
   printf("Verwendetes Hoehenmodell            :  %s\n", dhmBeschreibung(dhm))              > protfile;
+  if (namFile != "0")
+    printf("Verwendete Namendatei               :  %s\n", namBeschreibung(namFile))        > protfile;
   printf("Berechnungen ab                        %d km\n", minDist / 1000)                 > protfile;
   printf("   bis                                 %d km\n", maxDist / 1000)                 > protfile;
   printf("   im Abstand von                      %d m durchgefuehrt\n", aufloesDist)       > protfile;
@@ -631,6 +924,8 @@ function prot(protfile, version, name, x, y, z, aziLi, aziRe, aufloesAzi, bildbr
     xyEntf[1], xyEntf[2], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z)     > protfile;
 }
 
+
+
 ##### rep #####
 # erzeugt n Zeichen vom Typ 's' und liefert sie zurueck
 function rep(n, s,    t) {
@@ -662,6 +957,32 @@ function skyplot(output, resultfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, azi
   close(output);
 }
 
+##### skyplotEinlesen #####
+# einlesen der numerischen Ausgabe von Skyplot
+# nur Datenzeilen beruecksichtigen (solche, die mit Zahlen beginnen)
+# aus den 3 Feldern die Arrays 'azi', 'hoehenwinkel' und 'distanz' bilden
+# die Felder muessen mit substr extrahiert werden, weil sie direkt aneinander grenzen
+# die Addition mit 0 erzwingt die Konvertierung in eine Zahl
+# Anzahl Datenzeilen zurueckliefern
+function skyplotEinlesen(resultfile,    i) {
+  new(azi);
+  new(hoehenwinkel);
+  new(distanz);
+  i = 0;
+  while ((getline < resultfile) > 0)
+    if ($1 ~ /^[1-9]/) {
+      i++;
+      azi[i] = substr($0, 1, 8);
+      azi[i] = azi[i] + 0;
+      hoehenwinkel[i] = substr($0, 9, 8);
+      hoehenwinkel[i] = hoehenwinkel[i] + 0;
+      distanz[i] = substr($0, 18, 8);
+      distanz[i] = distanz[i] + 0;
+    }
+  close(resultfile);
+  return i;
+}
+
 ##### theoausweit #####
 # Naeherungsformel für die Berechnung der theoretischen Aussichtsweite eines Punktes in Metern
 # (1 - k): setzt sich zusammen aus 1 minus mittlerer Refraktionskoeffizient (~0.13)
@@ -675,9 +996,9 @@ function theoausweit(z,    k, erdRad) {
 ##### usage #####
 # gibt aus, wie das Programm parametrisiert werden muss
 function usage() {
-  printf("\n%s\n", rep(140, "*"));
-  printf("  Usage: skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufloes-Azi> <Azi links> <Azi rechts> <Bildbreite> <Min-Dist> <Max-Dist> <Aufloes-Dist>\n");
-  printf("%s\n\n", rep(140, "*"));
+  printf("\n%s\n", rep(141, "*"));
+  printf("  Usage: skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufl-Azi> <Azi li> <Azi re> <Bildbr> <Min-Dist> <Max-Dist> <Aufloes-Dist> <Nam> <Tol>\n");
+  printf("%s\n\n", rep(141, "*"));
   printf("Das Programm erzeugt ein Panorama mit aus Punkten gebildeten Silhouetten von einem beliebigen Punkt\n");
   printf("\n");
   printf("Erlaeuterung der Argumente\n");
@@ -689,16 +1010,23 @@ function usage() {
   printf("   dhm25   (kartenbasiertes digitales Hoehenmodell der Schweiz und umliegender Gebiete mit 25 m Aufloesung)\n");
   printf("   srtm    (SRTM-Mosaik der Alpen mit ca. 30 m Aufloseung)\n");
   printf("   euD     (euroDEM, das europaeische Hoehenmodell mit ca. 60 m  Aufloesung)\n");
-  printf("<Aufloesung-Azi> ist die azimutale Aufloesung in gon.\n");
-  printf("<Azi links> <Azi rechts> sind das ganzzahlige linke und rechte Azimut in gon.\n");
-  printf("<Bildbreite> ist die ganzzahlige gewuenschte Bildbreite in mm.\n");
+  printf("<Auf-Azi> ist die azimutale Aufloesung in gon.\n");
+  printf("<Azi li> und <Azi re> sind das ganzzahlige linke und rechte Azimut in gon.\n");
+  printf("<Bildbr> ist die ganzzahlige gewuenschte Bildbreite in mm.\n");
   printf("<Min-Dist> definiert, ab welcher Distanz in km (Ganzzahl) vom Projektionszentrum die Berechnung vorgenommen wird.\n");
   printf("<Max-Dist> definiert, bis zu welcher Distanz in km (Ganzzahl) vom Projektionszentrum die Berechnung vorgenommen wird.\n");
   printf("<Aufloes-Dist> definiert, in welchen Intervallen (km-Abstand zu <Min-Dist>) Berechnungen durchgefuehrt werden, bis <Max-Dist> erreicht ist.\n");
+  printf("<Nam> definiert, aufgrund welcher Namendatei die Beschriftung vorgenommen werden soll. Folgende stehen zur Verfuegung:\n");
+  printf("   sn200   (swissTLM-Regio Names)\n");
+  printf("   sn500   (DKM500 Namen)\n");
+  printf("   sn1000  (DKM1000 Namen)\n");
+  printf("   sn10000 (benutzerdefinierte Namendatei)\n");
+  printf("   0       (keine Beschriftung)\n");
+  printf("<Tol> ist die Toleranz in m innerhalb der bei berechneten Punkten nach Namen im Namensfile gesucht werden soll.\n");
   printf("\n");
   printf("Beispiel\n");
   printf("%s\n", rep(8, "-"));
-  printf("  skyplot2pano.awk 610558 197236 635 Gantrischweg dhm25 0.1 200 250 400 0 40 1\n");
+  printf("  skyplot2pano.awk 610558 197236 635 Gantrischweg dhm25 0.1 200 250 400 0 40 1 sn200 50\n");
 }
 
 ##### username #####
