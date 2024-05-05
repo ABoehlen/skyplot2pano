@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         21.04.2024
-# Version:      1.7
+# Date:         03.05.2024
+# Version:      1.10
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               Berechnung von Sichtbarkeitskennwerten
@@ -26,6 +26,9 @@
 
 BEGIN {
 
+  # Zeitstempel Beginn
+  start = systime();
+
   # Field Separator auf "," stellen, zwecks Einlesen des temporaer erzeugten Namensfiles
   FS = ",";
 
@@ -38,16 +41,16 @@ BEGIN {
     ##### vorbereiten #####
 
     # diverse Variablen initialisieren
-    version = 1.7;
+    version = "1.10";
     formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
     formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
     formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
-    formatNamTmp = "%s, %d, %d, %d, %d\n";
+    formatNamTmp = "%s, %d, %d, %d, %d\n"; 
     minX = 0;
     maxX = 0;
-    minY = 0;
-    maxY = 0;
+    minY = -1000; # auf -1000 setzen, damit auch bei Berechnungen unter dem mathematischen Horizont korrekte Ergebnisse resultieren
+    maxY = -1000;
 
     # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
     x = ARGV[1];
@@ -344,8 +347,11 @@ BEGIN {
                       if (nameHoehe == bisherigeNamen[m])
                         existiertNam = 1;
                     # Name mit relevanten Informationen in temporaere Textdatei schreiben, sofern nicht bereits vorhanden
-                    if (existiertNam == 0)
-                      printf(formatNamTmp, namName[nam], namZ[nam], distanz[j], abstX, abstY) > namTmpFile;
+                    if (existiertNam == 0) {
+                      namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM);
+                      namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
+                      printf(formatNamTmp, namName[nam], namZ[nam], distanz[j], namAbstX, namAbstY) > namTmpFile;
+                    }
                     else
                       existiertNam = 0;
                     bisherigeNamen[m] = nameHoehe; # aktueller Name ins Array eintragen
@@ -393,6 +399,10 @@ BEGIN {
     ###########################################
     ########### 4. Teil: Abschluss ############
     ###########################################
+	
+    # Dauer der Berechnung ermitteln und ausgeben
+	berechnungsdauer = convertsecs(systime() - start);
+    printf("\nDauer der Berechnung: %s\n", berechnungsdauer);
 
     ##### Berechnungsprotokoll erstellen #####
     protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
@@ -413,6 +423,7 @@ BEGIN {
     # um Awk zu zwingen, das Programm zu beenden, ohne Files zu lesen
     if (ARGV[14] == "")
       exit;
+
   }
 }
 
@@ -426,6 +437,16 @@ function abbruch(info) {
   print info;
   print "Programm wird beendet.\n";
   exit;
+}
+
+##### azimut #####
+# Berechnet das Azimut von xB/yB von xA/yA in gon
+function azimut(xA, yA, xB, yB,    azi) {
+  azi = atan2(xB - xA, yB - yA);
+  if (azi >= 0)
+    return rad2gon(azi);
+  else
+    return 400 - rad2gon(azi) * -1;
 }
 
 ##### bestimmeXY #####
@@ -502,6 +523,35 @@ function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
     return dist = -1;
 }
 
+##### bildkooX #####
+# ermittelt die Bildkoordinate X ausgehend von der aeusseren und inneren
+# Orientierung des Projektionszentrums
+function bildkooX(xP, yP, xE, yE, aziLi, gonInMM,    azi) {
+  azi = azimut(xP, yP, xE, yE);
+  return (azi - aziLi) * gonInMM;
+}
+
+##### bildkooY #####
+# ermittelt die Bildkoordinate Y ausgehend von der aeusseren und inneren
+# Orientierung des Projektionszentrums
+function bildkooY(xP, yP, zP, xE, yE, zE, radPr,    entf, entfEbene, hdiff, hdiffEkrref, hwink) {
+  hdiff = zE - zP;
+  entfEbene = distanzEbene(xP, yP, xE, yE);
+  hdiffEkrref = hdiff - ekrref(entfEbene);
+  entf = sqrt(entfEbene ^ 2 + hdiffEkrref ^ 2);
+  hwink = asin(hdiffEkrref / entf);
+  return radPr * tan(hwink);
+}
+
+##### convertsecs #####
+# rechnet Sekunden in formatierte Ausgabe Std. Min. und Sek. um
+function convertsecs(sec,    h, m, s) {
+  h = sec / 3600;
+  m = (sec % 3600) / 60;
+  s = sec % 60;
+  return sprintf("%02d Std. %02d Min. %02d Sek.\n", h, m, s);
+}
+
 ##### dhmBeschreibung #####
 # Ausgeben des genauen Namens des angegebenen Hoehenmodells
 function dhmBeschreibung(dhmTyp) {
@@ -539,6 +589,12 @@ function dhmKopieren(dhmTyp, dhmName) {
     system("cp $SCOP_ROOT/euroDEM/euroDEMclip.dtm " dhmName);
   else
     abbruch("\nungueltiges Hoehenmodell.");
+}
+
+##### distanzEbene #####
+# Berechnet die Distanz in der Ebene zwischen xA/yA und xB/yB in den Einheiten des Koordinatensystems
+function distanzEbene(xA, yA, xB, yB) {
+  return sqrt((xA - xB) ^ 2 + (yA - yB) ^ 2);
 }
 
 ##### distGre #####
@@ -864,7 +920,7 @@ function namKopieren(namFile) {
   else if (namFile == "sn10000.txt")
     system("cp $SCOP_ROOT/scop/util/SWNA/sn10000.txt .");
   else
-    abbruch("\nungueltiges Hoehenmodell.");
+    abbruch("\nungueltige Namendatei.");
 }
 
 ##### new #####
@@ -904,6 +960,7 @@ function prot(protfile) {
   printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                        > protfile;
   printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)              > protfile;
   printf("Anzahl Berechnungen                 :  %d\n", (maxDist - minDist) / aufloesDist) > protfile;
+  printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                  > protfile;
   printf("\n\n\nTopographische Extrempunkte\n")                                            > protfile;
   printf("%s\n\n", rep(27, "*"))                                                           > protfile;
   printf("Extrempunkt    " formatProtTxt,\
@@ -1047,6 +1104,18 @@ function gon2rad(gon) {
   return pi() / (400 / 2) * gon;
 }
 
+function rad2gon(rad) {
+  return rad * (400 / 2) / pi();
+}
+
+function asin(x) {
+  return atan2(x, sqrt(1 - x * x));
+}
+
+function tan(winkel) {
+  return sin(winkel) / cos(winkel);
+}
+
 function ankatheteAusHypotenuseUndWinkel(c, winkelGon) {
   return c * sin(gon2rad(100 - winkelGon));
 }
@@ -1061,8 +1130,4 @@ function ankatheteAusGegenkatheteUndWinkel(a, winkelGon) {
 
 function hypotenuseAusAnkatheteUndWinkel(b, winkelGon) {
   return b / cos(gon2rad(winkelGon));
-}
-
-function tan(winkel) {
-  return sin(winkel) / cos(winkel);
 }
