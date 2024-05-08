@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         03.05.2024
-# Version:      1.10
+# Date:         08.05.2024
+# Version:      1.11
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               Berechnung von Sichtbarkeitskennwerten
@@ -41,15 +41,15 @@ BEGIN {
     ##### vorbereiten #####
 
     # diverse Variablen initialisieren
-    version = "1.10";
+    version = "1.11";
     formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
     formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
     formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
     formatNamTmp = "%s, %d, %d, %d, %d\n"; 
-    minX = 0;
-    maxX = 0;
-    minY = -1000; # auf -1000 setzen, damit auch bei Berechnungen unter dem mathematischen Horizont korrekte Ergebnisse resultieren
+    minX = -1000; # damit auch bei Berechnungen unter dem mathematischen Horizont korrekte Ergebnisse resultieren
+    maxX = -1000;
+    minY = -1000;
     maxY = -1000;
 
     # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
@@ -1027,7 +1027,7 @@ function skyplotEinlesen(resultfile,    i) {
   new(distanz);
   i = 0;
   while ((getline < resultfile) > 0)
-    if ($1 ~ /^[1-9]/) {
+    if ($1 ~ /^[1-9 ]/) {
       i++;
       azi[i] = substr($0, 1, 8);
       azi[i] = azi[i] + 0;
