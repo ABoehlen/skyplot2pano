@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         08.05.2024
-# Version:      1.11
+# Date:         18.05.2024
+# Version:      1.12
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               Berechnung von Sichtbarkeitskennwerten
@@ -41,7 +41,7 @@ BEGIN {
     ##### vorbereiten #####
 
     # diverse Variablen initialisieren
-    version = "1.11";
+    version = "1.12";
     formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
     formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
@@ -840,7 +840,9 @@ function modellhoehe(resultfile,    mh) {
 ##### namBeschreibung #####
 # Ausgeben des genauen Namens der angegebenen Namendatei
 function namBeschreibung(namTyp) {
-  if (namTyp == "sn200.txt")
+  if (namTyp == "sn10.txt")
+    return "swissNames3D";
+  else if (namTyp == "sn200.txt")
     return "swissTLM-Regio Names";
   else if (namTyp == "sn500.txt")
     return "DKM500 Namen";
@@ -911,7 +913,9 @@ function namTmpEinlesen(namTmpFile,    i) {
 ##### namKopieren #####
 # Namensfile ins Arbeitsverzeichnis kopieren
 function namKopieren(namFile) {
-  if (namFile == "sn200.txt")
+  if (namFile == "sn10.txt")
+    system("cp $SCOP_ROOT/scop/util/SWNA/sn10.txt .");
+  else if (namFile == "sn200.txt")
     system("cp $SCOP_ROOT/scop/util/SWNA/sn200.txt .");
   else if (namFile == "sn500.txt")
     system("cp $SCOP_ROOT/scop/util/SWNA/sn500.txt .");
@@ -1073,12 +1077,13 @@ function usage() {
   printf("<Min-Dist> definiert, ab welcher Distanz in km (Ganzzahl) vom Projektionszentrum die Berechnung vorgenommen wird.\n");
   printf("<Max-Dist> definiert, bis zu welcher Distanz in km (Ganzzahl) vom Projektionszentrum die Berechnung vorgenommen wird.\n");
   printf("<Aufloes-Dist> definiert, in welchen Intervallen (km-Abstand zu <Min-Dist>) Berechnungen durchgefuehrt werden, bis <Max-Dist> erreicht ist.\n");
-  printf("<Nam> definiert, aufgrund welcher Namendatei die Beschriftung vorgenommen werden soll. Folgende stehen zur Verfuegung:\n");
+  printf("<Nam> definiert, ob und aufgrund welcher Namendatei die Beschriftung vorgenommen werden soll. Folgende stehen zur Verfuegung:\n");
+  printf("   0       (keine Beschriftung)\n");
+  printf("   sn10    (swissNames3D)\n");
   printf("   sn200   (swissTLM-Regio Names)\n");
   printf("   sn500   (DKM500 Namen)\n");
   printf("   sn1000  (DKM1000 Namen)\n");
   printf("   sn10000 (benutzerdefinierte Namendatei)\n");
-  printf("   0       (keine Beschriftung)\n");
   printf("<Tol> ist die Toleranz in m innerhalb der bei berechneten Punkten nach Namen im Namensfile gesucht werden soll.\n");
   printf("\n");
   printf("Beispiel\n");
