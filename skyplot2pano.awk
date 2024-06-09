@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         18.05.2024
-# Version:      1.12
+# Date:         09.06.2024
+# Version:      1.13
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               Berechnung von Sichtbarkeitskennwerten
@@ -41,7 +41,7 @@ BEGIN {
     ##### vorbereiten #####
 
     # diverse Variablen initialisieren
-    version = "1.12";
+    version = "1.13";
     formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
     formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
@@ -831,8 +831,10 @@ function maxDists(x, y, maxdist, richt) {
 # ermitteln der Modellhoehe und zurueckliefern
 function modellhoehe(resultfile,    mh) {
   while ((getline < resultfile) > 0)
-    if ($1 ~ /^Model/)
-      mh = $3;
+    if ($0 ~ /^Model/) {
+      mh = substr($0, 50, 7);
+      mh = mh + 0;
+    }
   close(resultfile);  
   return mh;
 }
@@ -936,40 +938,40 @@ function new(array) {
 ##### prot #####
 # erzeugt Berechnungsprotokoll
 function prot(protfile) {
-  printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))           > protfile;
-  printf("Berechnet von: %s\n\n\n", username())                                            > protfile;
-  printf("%s\n", rep(90, "*"))                                                             > protfile;
-  printf("Berechnungsprotokoll skyplot2pano v%s, %s\n", version, name)                     > protfile;
-  printf("%s\n", rep(90, "*"))                                                             > protfile;
-  printf("\n\nEingabe\n")                                                                  > protfile;
-  printf("%s\n\n", rep(7, "*"))                                                            > protfile;
-  printf("Standort                            :  %d / %d / %d\n", x, y, z)                 > protfile;
-  printf("Name                                :  %s\n", name)                              > protfile;
-  printf("Azimut links                        :  %d gon\n", aziLi)                         > protfile;
-  printf("Azimut rechts                       :  %d gon\n", aziRe)                         > protfile;
-  printf("Azimutale Aufloesung                :  %.3f gon\n", aufloesAzi)                  > protfile;
-  printf("Bildbreite                          :  %d mm\n", bildbr)                         > protfile;
-  printf("Verwendetes Hoehenmodell            :  %s\n", dhmBeschreibung(dhm))              > protfile;
-  if (namFile != "0")
-    printf("Verwendete Namendatei               :  %s\n", namBeschreibung(namFile))        > protfile;
-  printf("Berechnungen ab                        %d km\n", minDist / 1000)                 > protfile;
-  printf("   bis                                 %d km\n", maxDist / 1000)                 > protfile;
-  printf("   im Abstand von                      %d m durchgefuehrt\n", aufloesDist)       > protfile;
-  printf("\n\n\nAbgeleitete Parameter\n")                                                  > protfile;
-  printf("%s\n\n", rep(21, "*"))                                                           > protfile;
-  printf("Eingegebene Hoehe                   :  %.1f m\n", z)                             > protfile;
-  printf("Interpolierte Hoehe im %-13s:  %.1f m\n", toupper(dhm), mhoehe)                  > protfile;
-  printf("Differenz                           :  %.1f m\n", z - mhoehe)                    > protfile;
-  printf("Oeffnungswinkel                     :  %d gon\n", aziRe - aziLi)                 > protfile;
-  printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                        > protfile;
-  printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)              > protfile;
-  printf("Anzahl Berechnungen                 :  %d\n", (maxDist - minDist) / aufloesDist) > protfile;
-  printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                  > protfile;
-  printf("\n\n\nTopographische Extrempunkte\n")                                            > protfile;
-  printf("%s\n\n", rep(27, "*"))                                                           > protfile;
-  printf("Extrempunkt    " formatProtTxt,\
-    "X", "Y", "Z", "D [km]", "Azi [gon]", "E-R [m]", "dH [m]")                             > protfile;
-  printf("%s\n", rep(68, "-"))                                                             > protfile;
+  printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))                 > protfile;
+  printf("Berechnet von: %s\n\n\n", username())                                                  > protfile;
+  printf("%s\n", rep(90, "*"))                                                                   > protfile;
+  printf("Berechnungsprotokoll skyplot2pano v%s, %s\n", version, name)                           > protfile;
+  printf("%s\n", rep(90, "*"))                                                                   > protfile;
+  printf("\n\nEingabe\n")                                                                        > protfile;
+  printf("%s\n\n", rep(7, "*"))                                                                  > protfile;
+  printf("Standort                            :  %d / %d / %d\n", x, y, z)                       > protfile;
+  printf("Name                                :  %s\n", name)                                    > protfile;
+  printf("Azimut links                        :  %d gon\n", aziLi)                               > protfile;
+  printf("Azimut rechts                       :  %d gon\n", aziRe)                               > protfile;
+  printf("Azimutale Aufloesung                :  %.3f gon\n", aufloesAzi)                        > protfile;
+  printf("Bildbreite                          :  %d mm\n", bildbr)                               > protfile;
+  printf("Verwendetes Hoehenmodell            :  %s\n", dhmBeschreibung(dhm))                    > protfile;
+  if (namFile != "0")                                                                            
+    printf("Verwendete Namendatei               :  %s\n", namBeschreibung(namFile))              > protfile;
+  printf("Berechnungen ab                        %d km\n", minDist / 1000)                       > protfile;
+  printf("   bis                                 %d km\n", maxDist / 1000)                       > protfile;
+  printf("   im Abstand von                      %d m durchgefuehrt\n", aufloesDist)             > protfile;
+  printf("\n\n\nAbgeleitete Parameter\n")                                                        > protfile;
+  printf("%s\n\n", rep(21, "*"))                                                                 > protfile;
+  printf("Eingegebene Hoehe                   :  %.1f m\n", z)                                   > protfile;
+  printf("Interpolierte Hoehe im %-13s:  %.1f m\n", toupper(dhm), mhoehe)                        > protfile;
+  printf("Differenz                           :  %.1f m\n", z - mhoehe)                          > protfile;
+  printf("Oeffnungswinkel                     :  %d gon\n", aziRe - aziLi)                       > protfile;
+  printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                              > protfile;
+  printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)                    > protfile;
+  printf("Anzahl Berechnungen                 :  %d\n", ((maxDist - minDist) / aufloesDist) + 1) > protfile;
+  printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                        > protfile;
+  printf("\n\n\nTopographische Extrempunkte\n")                                                  > protfile;
+  printf("%s\n\n", rep(27, "*"))                                                                 > protfile;
+  printf("Extrempunkt    " formatProtTxt,\                                                       
+    "X", "Y", "Z", "D [km]", "Azi [gon]", "E-R [m]", "dH [m]")                                   > protfile;
+  printf("%s\n", rep(68, "-"))                                                                   > protfile;
 
   printf("Noerdlichster: " formatProtDat,\
     exNord["x"], exNord["y"], exNord["z"], exNord["Distanz"] / 1000, exNord["Azi"], ekrref(exNord["Distanz"]), exNord["z"] - z) > protfile;
@@ -984,8 +986,6 @@ function prot(protfile) {
   printf("Entferntester: " formatProtDat,\
     xyEntf[1], xyEntf[2], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z)     > protfile;
 }
-
-
 
 ##### rep #####
 # erzeugt n Zeichen vom Typ 's' und liefert sie zurueck
