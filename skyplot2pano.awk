@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         09.06.2024
-# Version:      1.13
+# Date:         09.08.2024
+# Version:      1.14
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               Berechnung von Sichtbarkeitskennwerten
@@ -41,7 +41,7 @@ BEGIN {
     ##### vorbereiten #####
 
     # diverse Variablen initialisieren
-    version = "1.13";
+    version = "1.14";
     formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
     formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
@@ -941,7 +941,8 @@ function prot(protfile) {
   printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))                 > protfile;
   printf("Berechnet von: %s\n\n\n", username())                                                  > protfile;
   printf("%s\n", rep(90, "*"))                                                                   > protfile;
-  printf("Berechnungsprotokoll skyplot2pano v%s, %s\n", version, name)                           > protfile;
+  printf("Berechnungsprotokoll %s\n", name)                                                      > protfile;
+  printf("skyplot2pano v%s, https://github.com/ABoehlen/skyplot2pano\n", version)                > protfile;
   printf("%s\n", rep(90, "*"))                                                                   > protfile;
   printf("\n\nEingabe\n")                                                                        > protfile;
   printf("%s\n\n", rep(7, "*"))                                                                  > protfile;
@@ -969,7 +970,7 @@ function prot(protfile) {
   printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                        > protfile;
   printf("\n\n\nTopographische Extrempunkte\n")                                                  > protfile;
   printf("%s\n\n", rep(27, "*"))                                                                 > protfile;
-  printf("Extrempunkt    " formatProtTxt,\                                                       
+  printf("Extrempunkt    " formatProtTxt,\
     "X", "Y", "Z", "D [km]", "Azi [gon]", "E-R [m]", "dH [m]")                                   > protfile;
   printf("%s\n", rep(68, "-"))                                                                   > protfile;
 
