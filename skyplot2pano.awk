@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         09.08.2024
-# Version:      1.14
+# Date:         20.09.2024
+# Version:      1.15
 #
 # Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               Berechnung von Sichtbarkeitskennwerten
@@ -41,16 +41,14 @@ BEGIN {
     ##### vorbereiten #####
 
     # diverse Variablen initialisieren
-    version = "1.14";
+    version = "1.15";
     formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
     formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
     formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
-    formatNamTmp = "%s, %d, %d, %d, %d\n"; 
-    minX = -1000; # damit auch bei Berechnungen unter dem mathematischen Horizont korrekte Ergebnisse resultieren
-    maxX = -1000;
-    minY = -1000;
-    maxY = -1000;
+    formatNamTmp = "%s, %d, %d, %d, %d\n";
+    anzBer = 0; # Anzahl Berechnungen pro Panoramabild
+    anzPte = 0; # Anzahl Azimute pro Berechnung
 
     # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
     x = ARGV[1];
@@ -77,9 +75,9 @@ BEGIN {
     if (namFile != "0") {
       namFile = namFile ".txt";
       namKopieren(namFile);
+      toleranz = ARGV[14];
+      toleranz = round(toleranz);
     }
-    toleranz = ARGV[14];
-    toleranz = round(toleranz);
 
     # Array zuruecksetzen, damit Argumente nicht als Files interpretiert werden
     ARGV[1] = "";
@@ -140,7 +138,10 @@ BEGIN {
     if (namFile != "0") {
       namTmpFile = "namTmp.txt"
       namDXFfile = "nam_" name "_" aziLi "-" aziRe ".dxf"
+      print "\n...Berechnung mit Namen...\n";
     }
+    else
+      print "\n...Berechnung ohne Namen...\n";
 
     # aus 'maxDist' einen relativen Wert ableiten, um spaeter die einzelnen Punkte den Werten 0 bis 10
     # zuzuweisen (0 = naheliegendst, 10 = entferntest)
@@ -266,6 +267,8 @@ BEGIN {
     # Berechnungen im Abstand von 'aufloesDist' durchfuehren, bis 'maxDist' erreicht ist
     for (i = minDist; i <= maxDist; i += aufloesDist) {
 
+      anzBer++; # Zaehler fuer die Anzahl Berechnungen
+
       # SCOP LIMITS festlegen
       N = maxDists(x, y, i, "N");
       E = maxDists(x, y, i, "E");
@@ -285,6 +288,10 @@ BEGIN {
 
       # am linken Bildrand beginnen
       abstX = 0;
+      if (anzBer == 1) {
+        minX = abstX; # minimale X-Koordinate bei erster Berechnung initialisieren
+        maxX = abstX; # maximale X-Koordinate bei erster Berechnung initialisieren
+      }
 
       # X/Y in Bildkoordinaten fuer jeden Eintrag der Skyplot-Ausgabe berechnen
       # der horizontale Abstand der Punkte entspricht einem gon im Bildkoordinatensystem...
@@ -292,6 +299,7 @@ BEGIN {
       # der vertikale Abstand der Punkte entspricht der Gegenkathete, wenn der
       # Projektionszylinderradius als Ankathete und der Hoehenwinkel als Alpha betrachtet wird
       for (j = 1; j <= maxRec; j++ ) {
+
         distDHMrand = distGre(i, azi[j]);
 
         if (distDHMrand == -1)
@@ -311,7 +319,14 @@ BEGIN {
         # vorhanden ist. Falls nicht, wird er in die Ausgabedatei geschrieben.
         # Die X-Bildkoordinate wird in jedem Fall um einen Schritt erhoeht.
         else {
+          anzPte++; # Zaehler fuer die Anzahl Azimute pro Berechnung
           abstY = radPr * tan(gon2rad(hoehenwinkel[j]));
+
+          if (anzBer == 1 && anzPte == 1) {
+            minY = abstY; # minimale Y-Koordinate bei erster Berechnung und erstem Punkt initialisieren
+            maxY = abstY; # maximale Y-Koordinate bei erster Berechnung und erstem Punkt initialisieren
+          } 
+
           xy = abstX abstY; # X und Y Bildkoordinate als String konkatenieren
           for (k in bisherigePte)
             if (xy == bisherigePte[k])
@@ -325,7 +340,8 @@ BEGIN {
             xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
             # Punkt in Panoramadatei schreiben
             printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], distanz[j], azi[j], hoehenwinkel[j], i, round((i - minDist) / distRel)) > panofile;
-            # minimale und maximale Bildkoordinaten ermitteln
+
+            # minimale und maximale Bildkoordinaten aktualisieren
             if (abstX < minX)
               minX = abstX;
             if (abstX > maxX)
@@ -334,7 +350,7 @@ BEGIN {
               minY = abstY;
             if (abstY > maxY)
               maxY = abstY;
-            
+
             # Falls ein Namensfile definiert wurde, pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen
             # und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
             if (namFile != "0") {
@@ -383,25 +399,48 @@ BEGIN {
       # Namen-Ergebnisfile der Panoramaberechnung einlesen
       anzNam = namTmpEinlesen(namTmpFile);
 
+      # Zuschlag rechts und oben, damit Texte innerhalb des Rahmens liegen
+      erwRechts = 60;
+      erwOben = 80;
+
+      # Pruefen, ob Namen nahe des rechten Bildrandes liegen, und falls ja, Rand um erwRechts nach rechts erweitern
+      namRe = 0;
+      for (i = 1; i <= anzNam; i++) {
+        if (namX[i] > namRe)
+          namRe = namX[i];
+      }
+      if ((maxX - namRe) < erwRechts)
+        maxX = maxX + erwRechts;
+
       # DXF aufbauen
-      dxfHeader(namDXFfile, minX, minY, maxX, maxY);
+      dxfHeader(namDXFfile, minX, minY, maxX, maxY + erwOben);
       dxfLinienBeginn(namDXFfile);
 
+      dxfLinienInhalt(namDXFfile, minX, 0, 10, 0, "HORIZONT");        # Horizontlinie links
+      dxfLinienInhalt(namDXFfile, maxX - 10, 0, maxX, 0, "HORIZONT"); # Horizontlinie rechts
+
+      dxfLinienInhalt(namDXFfile, minX, minY, minX, maxY + erwOben, "RAHMEN");           # vertikale Linie links
+      dxfLinienInhalt(namDXFfile, maxX, minY, maxX, maxY + erwOben, "RAHMEN");           # vertikale Linie rechts
+      dxfLinienInhalt(namDXFfile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
+      dxfLinienInhalt(namDXFfile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
+
+      dxfText(namDXFfile, minX + 3, 1, 0 , "H", "HORIZONT"); # Text "H" links
+      dxfText(namDXFfile, maxX - 6, 1, 0 , "H", "HORIZONT"); # Text "H" rechts
+
       for (i = 1; i <= anzNam; i++)
-        dxfLinienInhalt(namDXFfile, namX[i], namY[i], maxY);
+        dxfLinienInhalt(namDXFfile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
       for (i = 1; i <= anzNam; i++)
-        dxfText(namDXFfile, namName[i], namX[i], maxY, namZ[i], namD[i]);
+        dxfText(namDXFfile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
 
       dxfAbschluss(namDXFfile);
     }
 
-
     ###########################################
     ########### 4. Teil: Abschluss ############
     ###########################################
-	
+
     # Dauer der Berechnung ermitteln und ausgeben
-	berechnungsdauer = convertsecs(systime() - start);
+    berechnungsdauer = convertsecs(systime() - start);
     printf("\nDauer der Berechnung: %s\n", berechnungsdauer);
 
     ##### Berechnungsprotokoll erstellen #####
@@ -680,11 +719,11 @@ function dxfLinienBeginn(namDXFfile) {
 
 ##### dxfLinienInhalt #####
 # erzeugt die Linien der DXF-Datei
-function dxfLinienInhalt(namDXFfile, x, y, maxY) {
+function dxfLinienInhalt(namDXFfile, x1, y1, x2, y2, typ) {
   printf("  0\n")                  >> namDXFfile;
   printf("POLYLINE\n")             >> namDXFfile;
   printf("  8\n")                  >> namDXFfile;
-  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  printf("%s\n", typ)              >> namDXFfile;
   printf(" 66\n")                  >> namDXFfile;
   printf("     1\n")               >> namDXFfile;
   printf(" 10\n")                  >> namDXFfile;
@@ -698,53 +737,53 @@ function dxfLinienInhalt(namDXFfile, x, y, maxY) {
   printf("  0\n")                  >> namDXFfile;
   printf("VERTEX\n")               >> namDXFfile;
   printf("  8\n")                  >> namDXFfile;
-  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  printf("%s\n", typ)              >> namDXFfile;
   printf(" 66\n")                  >> namDXFfile;
   printf("     1\n")               >> namDXFfile;
   printf(" 10\n")                  >> namDXFfile;
-  printf("%.1f\n", x)              >> namDXFfile;
+  printf("%.1f\n", x2)             >> namDXFfile;
   printf(" 20\n")                  >> namDXFfile;
-  printf("%.1f\n", maxY + 10)      >> namDXFfile;
+  printf("%.1f\n", y2 )            >> namDXFfile;
   printf(" 30\n")                  >> namDXFfile;
   printf("0.0\n")                  >> namDXFfile;
   printf("  0\n")                  >> namDXFfile;
   printf("VERTEX\n")               >> namDXFfile;
   printf("  8\n")                  >> namDXFfile;
-  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  printf("%s\n", typ)              >> namDXFfile;
   printf(" 66\n")                  >> namDXFfile;
   printf("     1\n")               >> namDXFfile;
   printf(" 10\n")                  >> namDXFfile;
-  printf("%.1f\n", x)              >> namDXFfile;
+  printf("%.1f\n", x1)             >> namDXFfile;
   printf(" 20\n")                  >> namDXFfile;
-  printf("%.1f\n", y + 0.5)        >> namDXFfile;
+  printf("%.1f\n", y1)             >> namDXFfile;
   printf(" 30\n")                  >> namDXFfile;
   printf("0.0\n")                  >> namDXFfile;
   printf("  0\n")                  >> namDXFfile;
   printf("SEQEND\n")               >> namDXFfile;
   printf("  8\n")                  >> namDXFfile;
-  printf("ZUORDNUNGSLINIEN\n")     >> namDXFfile;
+  printf("%s\n", typ)              >> namDXFfile;
   close(namDXFfile);
 }
 
 ##### dxfText #####
 # erzeugt die Schriften der DXF-Datei
-function dxfText(namDXFfile, name, x, maxY, z, dist) {
+function dxfText(namDXFfile, x, y, winkel, text, typ) {
   printf("  0\n")                                    >> namDXFfile;
   printf("TEXT\n")                                   >> namDXFfile;
   printf("  8\n")                                    >> namDXFfile;
-  printf("BERGNAMEN\n")                              >> namDXFfile;
+  printf("%s\n", typ)                                >> namDXFfile;
   printf(" 10\n")                                    >> namDXFfile;
   printf("%.1f\n", x)                                >> namDXFfile;
   printf(" 20\n")                                    >> namDXFfile;
-  printf("%.1f\n", maxY + 12)                        >> namDXFfile;
+  printf("%.1f\n", y)                                >> namDXFfile;
   printf(" 30\n")                                    >> namDXFfile;
   printf("0.0\n")                                    >> namDXFfile;
   printf(" 40\n")                                    >> namDXFfile;
   printf("3\n")                                      >> namDXFfile;
   printf(" 50\n")                                    >> namDXFfile;
-  printf("45\n")                                     >> namDXFfile;
+  printf("%d\n", winkel)                             >> namDXFfile;
   printf("  1\n")                                    >> namDXFfile;
-  printf("%s  %d m / %.1f km\n", name, z, dist/1000) >> namDXFfile;
+  printf("%s\n", text)                               >> namDXFfile;
   close(namDXFfile);
 }
 
@@ -966,7 +1005,7 @@ function prot(protfile) {
   printf("Oeffnungswinkel                     :  %d gon\n", aziRe - aziLi)                       > protfile;
   printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                              > protfile;
   printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)                    > protfile;
-  printf("Anzahl Berechnungen                 :  %d\n", ((maxDist - minDist) / aufloesDist) + 1) > protfile;
+  printf("Anzahl Berechnungen                 :  %d\n", anzBer)                                  > protfile;
   printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                        > protfile;
   printf("\n\n\nTopographische Extrempunkte\n")                                                  > protfile;
   printf("%s\n\n", rep(27, "*"))                                                                 > protfile;
