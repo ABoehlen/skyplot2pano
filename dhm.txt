@@ -1,0 +1,2 @@
+Kuerzel  ,Pfad                                             ,Beschreibung  
+dhm1000  ,$SCOP_ROOT/chdtedrdh/dhm1000.dtm                 ,Digitales Hoehenmodell DHM25 (1000 m  Gitter)

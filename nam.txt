@@ -1,0 +1,2 @@
+Kuerzel  ,Pfad                                             ,Beschreibung  
+sn10000  ,$SCOP_ROOT/scop/util/SWNA/sn10000.txt            ,benutzerdefiniertes Namensfile

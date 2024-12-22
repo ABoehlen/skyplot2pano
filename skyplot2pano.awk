@@ -3,22 +3,21 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         20.09.2024
-# Version:      1.15
+# Date:         22.12.2024
+# Version:      2.0
 #
-# Purpose:      Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
-#               Berechnung von Sichtbarkeitskennwerten
-#               Beschriftung der dargestellten Punkte anhand einer Namendatei
-#               Eingegebene und abgeleitete Parameter werden in ein Protokoll geschrieben
+# Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
+#               - Berechnung von Sichtbarkeitskennwerten
+#               - optionale Beschriftung der dargestellten Punkte basierend auf einer Namendatei
+#               - Eingegebene und abgeleitete Parameter werden in ein Protokoll geschrieben
 #
 # Requirements: - das Programm verwendet UNIX-Kommandos, muss also wenn unter Windows betrieben, in einem UNIX-Emulator ausgefuehrt werden
 #               - die zu verwendenden Hoehenmodelle muessen im Format SCOP RDH vorliegen
-#               - der Speicherort der verwendeten Hoehenmodelle muss in der Funktion 'dhmKopieren' festgelegt werden
-#               - die Aufrufparameter der verwendeten Hoehenmodelle sind in der Funktion 'dhmBeschreibung' festzulegen
-#               - der Speicherort der verwendeten Namensfiles muss in der Funktion 'namKopieren' festgelegt werden
-#               - die Aufrufparameter der verwendeten Namensfiles sind in der Funktion 'namBeschreibung' festzulegen
+#               - die Parameter der verwendeten Hoehenmodelle muessen in der Datei 'dhm.txt' festgelegt werden
+#               - die Parameter der verwendeten Namensfiles muessen in der Datei 'nam.txt' festgelegt werden
+#               - die Pfade zu diesen beiden Textdateien sind in den Zeilen 38 und 42 festzulegen
 #               - die verwendeten Namensfiles muessen im gleich strukturierten Textformat vorliegen wie fuer die Benutzung mit SCOP.PER
-#               - das SCOP Utility Programm skyplot.exe muss vorhanden und Ã¼ber den Befehl 'skyplot' aufrufbar sein
+#               - das SCOP Utility Programm 'skyplot.exe' muss vorhanden und über den Befehl 'skyplot' aufrufbar sein
 #
 # Usage:        skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufl-Azi> <Azi li> <Azi re> <Bildbr> <Min-Dist> <Max-Dist> <Aufloes-Dist> <Nam> <Tol>
 #
@@ -28,25 +27,42 @@ BEGIN {
 
   # Zeitstempel Beginn
   start = systime();
+  
+  # Versionsnummer
+  version = "2.0";
 
-  # Field Separator auf "," stellen, zwecks Einlesen des temporaer erzeugten Namensfiles
+  # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
+
+  # Liste der verfuegbaren Hoehenmodelle einlesen
+  copy("$SCOP_ROOT/scop/util/dhm.txt", ".", "Konfigurationsdatei dhm.txt existiert nicht");
+  anzDhm = dhmListeEinlesen("dhm.txt");
+
+  # Liste der verfuegbaren Namensfiles einlesen
+  copy("$SCOP_ROOT/scop/util/nam.txt", ".", "Konfigurationsdatei nam.txt existiert nicht");
+  anzNamFiles = namListeEinlesen("nam.txt");
 
   # Usage ausgeben, wenn zuwenig Argumente
   if (ARGC < 15) { 
-    usage();
+    usage(version);
+    system("rm -f dhm.txt");
+    system("rm -f nam.txt");
     exit;
   }
   else {
     ##### vorbereiten #####
 
+    # Programmtitel ausgeben
+    printTitel(version, strftime("%d.%m.%Y", systime()));
+
     # diverse Variablen initialisieren
-    version = "1.15";
-    formatSilTxt = "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
-    formatSilDat = "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
+    formatExtrTxt = "%7s, %7s, %4s, %-15s\n";
+    formatExtrDat = "%7d, %7d, %4d, %-15s\n";
+    formatSilTxt =  "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
+    formatSilDat =  "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
     formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
-    formatNamTmp = "%s, %d, %d, %d, %d\n";
+    formatNamTmp =  "%s, %d, %d, %d, %d\n";
     anzBer = 0; # Anzahl Berechnungen pro Panoramabild
     anzPte = 0; # Anzahl Azimute pro Berechnung
 
@@ -98,24 +114,29 @@ BEGIN {
     # Usage ausgeben, wenn zuviele Argumente
     if (ARGV[15] != "") {
       usage();
+      system("rm -f dhm.txt");
+      system("rm -f nam.txt");
       exit;
     }
 
     # Plausibilitaet der Argumente pruefen. Andernfalls Fehlermeldung ausgeben und beenden
     if (aziLi < -400 || aziLi > 400)
-      abbruch("\nlinkes Azimut muss zwischen -400 und +400 gon betragen.");
+      abort("\nlinkes Azimut muss zwischen -400 und +400 gon betragen.");
 
     if (aziRe < -400 || aziRe > 400)
-      abbruch("\nrechtes Azimut muss zwischen -400 und +400 gon betragen.");
+      abort("\nrechtes Azimut muss zwischen -400 und +400 gon betragen.");
 
     if (aziLi >= aziRe)
-      abbruch("\nlinkes Azimut muss kleiner sein als rechtes Azimut.");
+      abort("\nlinkes Azimut muss kleiner sein als rechtes Azimut.");
 
     if (minDist < 0)
-      abbruch("\ndie minimale Distanz kann nicht kleiner als 0 sein.");
+      abort("\ndie minimale Distanz kann nicht kleiner als 0 sein.");
 
     if (minDist >= maxDist)
-      abbruch("\ndie minimale Distanz muss kleiner als die maximale Distanz sein.");
+      abort("\ndie minimale Distanz muss kleiner als die maximale Distanz sein.");
+
+    # Hoehenmodell als sky.rdh kopieren
+    dhmKopieren(dhm, "sky.rdh");
 
     # Oeffnungswinkel bestimmen
     # 1 gon im Bildkoordinatensystem ermitteln
@@ -127,8 +148,9 @@ BEGIN {
     umfang = 400 / oeffWink * bildbr;
     radPr = umfang / (2 * pi());
 
-    # Hoehenmodell als sky.rdh kopieren
-    dhmKopieren(dhm, "sky.rdh");
+    # Extrempunktedatei vorbereiten
+    extrfile = "extr_" name "_" aziLi "-" aziRe ".txt"
+    printf(formatExtrTxt, "X", "Y", "Z", "Extrempunkt") > extrfile;
 
     # Panoramadatei vorbereiten
     panofile = "sil_" name "_" aziLi "-" aziRe ".txt"
@@ -137,15 +159,15 @@ BEGIN {
     # Namen-Ausgabedateien vorbereiten
     if (namFile != "0") {
       namTmpFile = "namTmp.txt"
-      namDXFfile = "nam_" name "_" aziLi "-" aziRe ".dxf"
+      namDXFFile = "nam_" name "_" aziLi "-" aziRe ".dxf"
       print "\n...Berechnung mit Namen...\n";
     }
     else
       print "\n...Berechnung ohne Namen...\n";
 
-    # aus 'maxDist' einen relativen Wert ableiten, um spaeter die einzelnen Punkte den Werten 0 bis 10
-    # zuzuweisen (0 = naheliegendst, 10 = entferntest)
-    distRel = (maxDist - minDist) / 10;
+    # aus 'minDist' und 'maxDist' einen Hilfswert ableiten, um spaeter die einzelnen Punkte den
+    # relative Werten 0 bis 10 zuzuweisen (0 = naheliegendst, 10 = entferntest)
+    distRelDiv = (maxDist - minDist) / 10;
 
 
     ###########################################
@@ -219,7 +241,7 @@ BEGIN {
       
       split(bestimmeXY(x, y, dist0, azi[i]), xyAkt, " ")
       if (xyAkt[1] == -1)
-        abbruch("\nungueltiges Azimut.");
+        abort("\nungueltiges Azimut.");
       else
         extrempunkteNESW(xyAkt[1], xyAkt[2], azi[i], distanz[i], hoehenwinkel[i]);
 
@@ -234,13 +256,22 @@ BEGIN {
     # X/Y/Z Koordinaten des entferntesten Punktes bestimmen
     dist0 = ankatheteAusHypotenuseUndWinkel(exEntf["Distanz"], exEntf["Hoehenwinkel"]);
     if (split(bestimmeXY(x, y, dist0, exEntf["Azi"]), xyEntf, " ") == -1)
-      abbruch("\nungueltiges Azimut.");
+      abort("\nungueltiges Azimut.");
     exEntf["z"] = hoeheAusDistanzUndWinkel(z, exEntf["Distanz"], exEntf["Hoehenwinkel"]);
 
     # X/Y Koordinaten des hoechsten Punktes bestimmen
     dist0 = ankatheteAusHypotenuseUndWinkel(exHoe["Distanz"], exHoe["Hoehenwinkel"]);
     if (split(bestimmeXY(x, y, dist0, exHoe["Azi"]), xyHoe, " ") == -1)
-      abbruch("\nungueltiges Azimut.");
+      abort("\nungueltiges Azimut.");
+
+    # Extrempunkte in CSV-Datei schreiben
+    printf(formatExtrDat, exNord["x"], exNord["y"], exNord["z"], "Noerdlichster") > extrfile;
+    printf(formatExtrDat, exOst["x"], exOst["y"], exOst["z"], "Oestlichster")     > extrfile;
+    printf(formatExtrDat, exSued["x"], exSued["y"], exSued["z"], "Suedlichster")  > extrfile;
+    printf(formatExtrDat, exWest["x"], exWest["y"], exWest["z"], "Westlichster")  > extrfile;
+    printf(formatExtrDat, xyHoe[1], xyHoe[2], exHoe["z"], "Hoechster")            > extrfile;
+    printf(formatExtrDat, xyEntf[1], xyEntf[2], exEntf["z"], "Entferntester")     > extrfile;
+    close(extrfile);
 
     # aufraeumen
     system("rm -f " resfile);
@@ -303,7 +334,7 @@ BEGIN {
         distDHMrand = distGre(i, azi[j]);
 
         if (distDHMrand == -1)
-          abbruch("\nungueltiges Azimut.");
+          abort("\nungueltiges Azimut.");
 
         # Distanz zur Begrenzung des Hoehenmodell-Ausschnitts geringfuegig reduzieren
         distDHMrand = int(distDHMrand) - 200;
@@ -335,11 +366,12 @@ BEGIN {
             dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
             # Bestimmen der Lagekoordinaten jedes Punktes
             if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
-              abbruch("\nungueltiges Azimut.");
+              abort("\nungueltiges Azimut.");
             # Bestimmen der Hoehe jedes Punktes
             xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
             # Punkt in Panoramadatei schreiben
-            printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], distanz[j], azi[j], hoehenwinkel[j], i, round((i - minDist) / distRel)) > panofile;
+            distRel = round((i - minDist) / distRelDiv);
+            printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panofile;
 
             # minimale und maximale Bildkoordinaten aktualisieren
             if (abstX < minX)
@@ -413,26 +445,26 @@ BEGIN {
         maxX = maxX + erwRechts;
 
       # DXF aufbauen
-      dxfHeader(namDXFfile, minX, minY, maxX, maxY + erwOben);
-      dxfLinienBeginn(namDXFfile);
+      dxfHeader(namDXFFile, minX, minY, maxX, maxY + erwOben);
+      dxfInhaltBeginn(namDXFFile);
 
-      dxfLinienInhalt(namDXFfile, minX, 0, 10, 0, "HORIZONT");        # Horizontlinie links
-      dxfLinienInhalt(namDXFfile, maxX - 10, 0, maxX, 0, "HORIZONT"); # Horizontlinie rechts
+      dxfLinienInhalt(namDXFFile, minX, 0, 10, 0, "HORIZONT");        # Horizontlinie links
+      dxfLinienInhalt(namDXFFile, maxX - 10, 0, maxX, 0, "HORIZONT"); # Horizontlinie rechts
 
-      dxfLinienInhalt(namDXFfile, minX, minY, minX, maxY + erwOben, "RAHMEN");           # vertikale Linie links
-      dxfLinienInhalt(namDXFfile, maxX, minY, maxX, maxY + erwOben, "RAHMEN");           # vertikale Linie rechts
-      dxfLinienInhalt(namDXFfile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
-      dxfLinienInhalt(namDXFfile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
+      dxfLinienInhalt(namDXFFile, minX, minY, minX, maxY + erwOben, "RAHMEN");           # vertikale Linie links
+      dxfLinienInhalt(namDXFFile, maxX, minY, maxX, maxY + erwOben, "RAHMEN");           # vertikale Linie rechts
+      dxfLinienInhalt(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
+      dxfLinienInhalt(namDXFFile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
 
-      dxfText(namDXFfile, minX + 3, 1, 0 , "H", "HORIZONT"); # Text "H" links
-      dxfText(namDXFfile, maxX - 6, 1, 0 , "H", "HORIZONT"); # Text "H" rechts
+      dxfText(namDXFFile, minX + 3, 1, 0 , "H", "HORIZONT"); # Text "H" links
+      dxfText(namDXFFile, maxX - 6, 1, 0 , "H", "HORIZONT"); # Text "H" rechts
 
       for (i = 1; i <= anzNam; i++)
-        dxfLinienInhalt(namDXFfile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
+        dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
       for (i = 1; i <= anzNam; i++)
-        dxfText(namDXFfile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
+        dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
 
-      dxfAbschluss(namDXFfile);
+      dxfAbschluss(namDXFFile);
     }
 
     ###########################################
@@ -445,14 +477,17 @@ BEGIN {
 
     ##### Berechnungsprotokoll erstellen #####
     protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
-    prot(protokoll);
+    prot(protokoll, version);
+	close(protokoll);
 
     ##### aufraeumen und beenden #####
+    system("rm -f dhm.txt");
+    system("rm -f nam.txt");
+    system("rm -f sky.rdh");
     system("rm -f SKYPLOT.CMD");
     system("rm -f SKYPLOT.LOG");
     system("rm -f SKYPLOT.PLT");
     system("rm -f SKYPLOT.RPT");
-    system("rm -f sky.rdh");
 
     if (namFile != "0") {
       system("rm -f " namFile);
@@ -470,13 +505,221 @@ BEGIN {
 ########## Funktionsdefinitionen ##########
 ###########################################
 
-##### abbruch #####
+########## allgemeine Funktionen ##########
+
+##### abort #####
 # Fehlermeldung ausgeben und Programm beenden
-function abbruch(info) {
+function abort(info) {
   print info;
   print "Programm wird beendet.\n";
   exit;
 }
+
+##### convertsecs #####
+# rechnet Sekunden in formatierte Ausgabe Std. Min. und Sek. um
+function convertsecs(sec,    h, m, s) {
+  h = sec / 3600;
+  m = (sec % 3600) / 60;
+  s = sec % 60;
+  return sprintf("%02d Std. %02d Min. %02d Sek.\n", h, m, s);
+}
+
+##### copy #####
+# kopiert Datei von 'source' nach 'target' mittels UNIX-Kommando cp
+# beendet das Programm, wenn der Kopiervorgang scheitert
+function copy(source, target, errorMsg,    exitStatus) {
+  exitStatus = system("cp " source " " target);
+  if (exitStatus != 0)
+    abort("\n" errorMsg);
+}
+
+##### new #####
+# erzeugt ein neues, leeres Array oder loescht den Inhalt eines bestehenden
+function new(array) {
+  split("", array);
+}
+
+##### rep #####
+# erzeugt n Zeichen vom Typ 's' und liefert sie zurueck
+function rep(n, s,    t) {
+  while (n-- > 0)
+    t = t s;
+  return t;
+}
+
+##### round #####
+# rundet angegebene Fliesskommazahl auf die naechste Ganzzahl
+function round(float) {
+  return int(float + 0.5);
+}
+
+##### username #####
+# ermittelt mit UNIX-Kommando den Usernamen und gibt ihn zurueck
+function username(    cmd) {
+  cmd = "whoami";
+  cmd | getline user;
+  close(cmd);
+  return user;
+}
+
+########## DXF-Funktionen ##########
+
+##### dxfHeader #####
+# erzeugt den Header der DXF-Datei
+function dxfHeader(dxfFile, minX, minY, maxX, maxY) {
+  printf("  0\n")             > dxfFile;
+  printf("SECTION\n")         > dxfFile;
+  printf("  2\n")             > dxfFile;
+  printf("HEADER\n")          > dxfFile;
+  printf("  9\n")             > dxfFile;
+  printf("$ACADVER\n")        > dxfFile;
+  printf("  1\n")             > dxfFile;
+  printf("AC1009\n")          > dxfFile;
+  printf("  9\n")             > dxfFile;
+  printf("$INSBASE\n")        > dxfFile;
+  printf(" 10\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
+  printf(" 20\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
+  printf(" 30\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
+  printf("  9\n")             > dxfFile;
+  printf("$EXTMIN\n")         > dxfFile;
+  printf(" 10\n")             > dxfFile;
+  printf("%.1f\n", minX)      > dxfFile;
+  printf(" 20\n")             > dxfFile;
+  printf("%.1f\n", minY)      > dxfFile;
+  printf(" 30\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
+  printf("  9\n")             > dxfFile;
+  printf("$EXTMAX\n")         > dxfFile;
+  printf(" 10\n")             > dxfFile;
+  printf("%.1f\n", maxX)      > dxfFile;
+  printf(" 20\n")             > dxfFile;
+  printf("%.1f\n", maxY + 70) > dxfFile;
+  printf(" 30\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
+  printf("  9\n")             > dxfFile;
+  printf("$TEXTSTYLE\n")      > dxfFile;
+  printf("  7\n")             > dxfFile;
+  printf("STANDARD\n")        > dxfFile;
+  printf("  0\n")             > dxfFile;
+  printf("ENDSEC\n")          > dxfFile;
+  close(dxfFile);
+}
+
+##### dxfInhaltBeginn #####
+# erzeugt den Beginn des Inhaltsbereiches der DXF-Datei
+function dxfInhaltBeginn(dxfFile) {
+  printf("  0\n")             >> dxfFile;
+  printf("SECTION\n")         >> dxfFile;
+  printf("  2\n")             >> dxfFile;
+  printf("ENTITIES\n")        >> dxfFile;
+  close(dxfFile);
+}
+
+##### dxfPunktInhalt #####
+# erzeugt die Punkte der DXF-Datei
+# fuer kuenftige Nutzung vorgesehen
+function dxfPunkteInhalt(dxfFile, x, y, typ) {
+  printf("  0\n")                  >> dxfFile;
+  printf("POINT\n")                >> dxfFile;
+  printf("  8\n")                  >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
+  printf(" 10\n")                  >> dxfFile;
+  printf("%.1f\n", x)              >> dxfFile;
+  printf(" 20\n")                  >> dxfFile;
+  printf("%.1f\n", y)              >> dxfFile;
+  printf(" 30\n")                  >> dxfFile;
+  printf("0.000000000\n")          >> dxfFile;
+  printf(" 39\n")                  >> dxfFile;
+  printf("0.000000000\n")          >> dxfFile;
+  printf(" 62\n")                  >> dxfFile;
+  printf("8.000000000\n")          >> dxfFile;
+  close(dxfFile);
+}
+
+##### dxfLinienInhalt #####
+# erzeugt die Linien der DXF-Datei
+function dxfLinienInhalt(dxfFile, x1, y1, x2, y2, typ) {
+  printf("  0\n")                  >> dxfFile;
+  printf("POLYLINE\n")             >> dxfFile;
+  printf("  8\n")                  >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
+  printf(" 66\n")                  >> dxfFile;
+  printf("     1\n")               >> dxfFile;
+  printf(" 10\n")                  >> dxfFile;
+  printf("0.0\n")                  >> dxfFile;
+  printf(" 20\n")                  >> dxfFile;
+  printf("0.0\n")                  >> dxfFile;
+  printf(" 30\n")                  >> dxfFile;
+  printf("0.0\n")                  >> dxfFile;
+  printf(" 70\n")                  >> dxfFile;
+  printf("     0\n")               >> dxfFile;
+  printf("  0\n")                  >> dxfFile;
+  printf("VERTEX\n")               >> dxfFile;
+  printf("  8\n")                  >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
+  printf(" 66\n")                  >> dxfFile;
+  printf("     1\n")               >> dxfFile;
+  printf(" 10\n")                  >> dxfFile;
+  printf("%.1f\n", x2)             >> dxfFile;
+  printf(" 20\n")                  >> dxfFile;
+  printf("%.1f\n", y2 )            >> dxfFile;
+  printf(" 30\n")                  >> dxfFile;
+  printf("0.0\n")                  >> dxfFile;
+  printf("  0\n")                  >> dxfFile;
+  printf("VERTEX\n")               >> dxfFile;
+  printf("  8\n")                  >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
+  printf(" 66\n")                  >> dxfFile;
+  printf("     1\n")               >> dxfFile;
+  printf(" 10\n")                  >> dxfFile;
+  printf("%.1f\n", x1)             >> dxfFile;
+  printf(" 20\n")                  >> dxfFile;
+  printf("%.1f\n", y1)             >> dxfFile;
+  printf(" 30\n")                  >> dxfFile;
+  printf("0.0\n")                  >> dxfFile;
+  printf("  0\n")                  >> dxfFile;
+  printf("SEQEND\n")               >> dxfFile;
+  printf("  8\n")                  >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
+  close(dxfFile);
+}
+
+##### dxfText #####
+# erzeugt die Schriften der DXF-Datei
+function dxfText(dxfFile, x, y, winkel, text, typ) {
+  printf("  0\n")                  >> dxfFile;
+  printf("TEXT\n")                 >> dxfFile;
+  printf("  8\n")                  >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
+  printf(" 10\n")                  >> dxfFile;
+  printf("%.1f\n", x)              >> dxfFile;
+  printf(" 20\n")                  >> dxfFile;
+  printf("%.1f\n", y)              >> dxfFile;
+  printf(" 30\n")                  >> dxfFile;
+  printf("0.0\n")                  >> dxfFile;
+  printf(" 40\n")                  >> dxfFile;
+  printf("3\n")                    >> dxfFile;
+  printf(" 50\n")                  >> dxfFile;
+  printf("%d\n", winkel)           >> dxfFile;
+  printf("  1\n")                  >> dxfFile;
+  printf("%s\n", text)             >> dxfFile;
+  close(dxfFile);
+}
+
+##### dxfAbschluss #####
+# beendet den Aufbau der DXF-Datei
+function dxfAbschluss(dxfFile) {
+  printf("  0\n")             >> dxfFile;
+  printf("ENDSEC\n")          >> dxfFile;
+  printf("  0\n")             >> dxfFile;
+  printf("EOF\n")             >> dxfFile;
+  close(dxfFile);
+}
+
+########## spezifische Funktionen ##########
 
 ##### azimut #####
 # Berechnet das Azimut von xB/yB von xA/yA in gon
@@ -573,61 +816,57 @@ function bildkooX(xP, yP, xE, yE, aziLi, gonInMM,    azi) {
 ##### bildkooY #####
 # ermittelt die Bildkoordinate Y ausgehend von der aeusseren und inneren
 # Orientierung des Projektionszentrums
-function bildkooY(xP, yP, zP, xE, yE, zE, radPr,    entf, entfEbene, hdiff, hdiffEkrref, hwink) {
-  hdiff = zE - zP;
+function bildkooY(xP, yP, zP, xE, yE, zE, radPr,    entf, entfEbene, hDiff, hdiffEkrref, hWink) {
+  hDiff = zE - zP;
   entfEbene = distanzEbene(xP, yP, xE, yE);
-  hdiffEkrref = hdiff - ekrref(entfEbene);
+  hdiffEkrref = hDiff - ekrref(entfEbene);
   entf = sqrt(entfEbene ^ 2 + hdiffEkrref ^ 2);
-  hwink = asin(hdiffEkrref / entf);
-  return radPr * tan(hwink);
-}
-
-##### convertsecs #####
-# rechnet Sekunden in formatierte Ausgabe Std. Min. und Sek. um
-function convertsecs(sec,    h, m, s) {
-  h = sec / 3600;
-  m = (sec % 3600) / 60;
-  s = sec % 60;
-  return sprintf("%02d Std. %02d Min. %02d Sek.\n", h, m, s);
+  hWink = asin(hdiffEkrref / entf);
+  return radPr * tan(hWink);
 }
 
 ##### dhmBeschreibung #####
 # Ausgeben des genauen Namens des angegebenen Hoehenmodells
-function dhmBeschreibung(dhmTyp) {
-  if (dhmTyp == "alti25")
-    return "Digitales Hoehenmodell swissALTI3D (25 m  Gitter)";
-  else if (dhmTyp == "dhm25")
-    return "Digitales Hoehenmodell DHM25 (25 m  Gitter)";
-  else if (dhmTyp == "komb")
-    return "Kombiniertes Hoehenmodell DHM25, Ferranti, SRTM, DTED (25 m  Gitter)";
-  else if (dhmTyp == "modt")
-    return "Kombiniertes Hoehenmodell DHM25, MONA, DTED (50 m  Gitter)";
-  else if (dhmTyp == "srtm")
-    return "Digitales Hoehenmodell SRTM (30 m  Gitter)";
-  else if (dhmTyp == "euD")
-    return "Digitales Hoehenmodell euroDEM (60 m  Gitter)";
-  else
-    abbruch("\nungueltiges Hoehenmodell.");
+function dhmBeschreibung(dhmTyp,    i) {
+  for (i = 1; i <= anzDhm; i++)
+    if (dhmTyp == dhmKuerz[i])
+      return dhmBeschr[i];
+}
+
+##### dhmListeEinlesen #####
+# einlesen der Liste mit den verfuegbaren Hoehenmodellen
+# nur Datenzeilen beruecksichtigen (Zeile 2 ff)
+# aus den 3 Feldern die Arrays 'dhmKuerz', 'dhmPfad' und 'dhmBeschr' bilden
+# Anzahl Datenzeilen zurueckliefern
+function dhmListeEinlesen(dhmListe,    i) {
+  new(dhmKuerz);
+  new(dhmPfad);
+  new(dhmBeschr);
+  i = 0;
+  while ((getline < dhmListe) > 0) {
+    if (i == 0) {
+      i++;
+      continue;
+    }
+    else {
+      gsub(/[ ]+$/,"",$1) # Leerzeichen am Ende entfernen
+      dhmKuerz[i] = $1;
+      dhmPfad[i] = $2;
+      dhmBeschr[i] = $3;
+      i++;
+    }
+  }
+  close(dhmListe);
+  return i - 1;
 }
 
 ##### dhmKopieren #####
 # Hoehenmodell ins Arbeitsverzeichnis kopieren
 # ln waere schneller, funktioniert aber bei Verwendung einer RAM-Disk nicht
-function dhmKopieren(dhmTyp, dhmName) {
-  if (dhmTyp == "alti25")
-    system("cp $SCOP_ROOT/swissalti/swissalti25.dtm " dhmName);
-  else if (dhmTyp == "dhm25")
-    system("cp $SCOP_ROOT/chdtedrdh/ch25_l2_dted.dtm " dhmName);
-  else if (dhmTyp == "komb")
-    system("cp $SCOP_ROOT/srtm/DHM25_Ferranti_SRTM_DTED.dtm " dhmName);
-  else if (dhmTyp == "modt")
-    system("cp $SCOP_ROOT/ch_mona_dted/ch50modt.dtm " dhmName);
-  else if (dhmTyp == "srtm")
-    system("cp $SCOP_ROOT/srtm/srtm_1arcsecond.dtm " dhmName);
-  else if (dhmTyp == "euD")
-    system("cp $SCOP_ROOT/euroDEM/euroDEMclip.dtm " dhmName);
-  else
-    abbruch("\nungueltiges Hoehenmodell.");
+function dhmKopieren(dhmTyp, dhmName,    i) {
+  for (i = 1; i <= anzDhm; i++)
+    if (dhmTyp == dhmKuerz[i])
+      copy(dhmPfad[i], dhmName, "angegebenes Hoehenmodell existiert nicht");
 }
 
 ##### distanzEbene #####
@@ -663,252 +902,108 @@ function distGre(haelfteMittelsenkr, aziGon,    dist) {
     return dist = -1;
 }
 
-##### dxfHeader #####
-# erzeugt den Header der DXF-Datei
-function dxfHeader(namDXFfile, minX, minY, maxX, maxY) {
-  printf("  0\n")             > namDXFfile;
-  printf("SECTION\n")         > namDXFfile;
-  printf("  2\n")             > namDXFfile;
-  printf("HEADER\n")          > namDXFfile;
-  printf("  9\n")             > namDXFfile;
-  printf("$ACADVER\n")        > namDXFfile;
-  printf("  1\n")             > namDXFfile;
-  printf("AC1009\n")          > namDXFfile;
-  printf("  9\n")             > namDXFfile;
-  printf("$INSBASE\n")        > namDXFfile;
-  printf(" 10\n")             > namDXFfile;
-  printf("0.0\n")             > namDXFfile;
-  printf(" 20\n")             > namDXFfile;
-  printf("0.0\n")             > namDXFfile;
-  printf(" 30\n")             > namDXFfile;
-  printf("0.0\n")             > namDXFfile;
-  printf("  9\n")             > namDXFfile;
-  printf("$EXTMIN\n")         > namDXFfile;
-  printf(" 10\n")             > namDXFfile;
-  printf("%.1f\n", minX)      > namDXFfile;
-  printf(" 20\n")             > namDXFfile;
-  printf("%.1f\n", minY)      > namDXFfile;
-  printf(" 30\n")             > namDXFfile;
-  printf("0.0\n")             > namDXFfile;
-  printf("  9\n")             > namDXFfile;
-  printf("$EXTMAX\n")         > namDXFfile;
-  printf(" 10\n")             > namDXFfile;
-  printf("%.1f\n", maxX)      > namDXFfile;
-  printf(" 20\n")             > namDXFfile;
-  printf("%.1f\n", maxY + 70) > namDXFfile;
-  printf(" 30\n")             > namDXFfile;
-  printf("0.0\n")             > namDXFfile;
-  printf("  9\n")             > namDXFfile;
-  printf("$TEXTSTYLE\n")      > namDXFfile;
-  printf("  7\n")             > namDXFfile;
-  printf("STANDARD\n")        > namDXFfile;
-  printf("  0\n")             > namDXFfile;
-  printf("ENDSEC\n")          > namDXFfile;
-  close(namDXFfile);
-}
-
-##### dxfLinienBeginn #####
-# erzeugt den Beginn der Linensektion der DXF-Datei
-function dxfLinienBeginn(namDXFfile) {
-  printf("  0\n")             >> namDXFfile;
-  printf("SECTION\n")         >> namDXFfile;
-  printf("  2\n")             >> namDXFfile;
-  printf("ENTITIES\n")        >> namDXFfile;
-  close(namDXFfile);
-}
-
-##### dxfLinienInhalt #####
-# erzeugt die Linien der DXF-Datei
-function dxfLinienInhalt(namDXFfile, x1, y1, x2, y2, typ) {
-  printf("  0\n")                  >> namDXFfile;
-  printf("POLYLINE\n")             >> namDXFfile;
-  printf("  8\n")                  >> namDXFfile;
-  printf("%s\n", typ)              >> namDXFfile;
-  printf(" 66\n")                  >> namDXFfile;
-  printf("     1\n")               >> namDXFfile;
-  printf(" 10\n")                  >> namDXFfile;
-  printf("0.0\n")                  >> namDXFfile;
-  printf(" 20\n")                  >> namDXFfile;
-  printf("0.0\n")                  >> namDXFfile;
-  printf(" 30\n")                  >> namDXFfile;
-  printf("0.0\n")                  >> namDXFfile;
-  printf(" 70\n")                  >> namDXFfile;
-  printf("     0\n")               >> namDXFfile;
-  printf("  0\n")                  >> namDXFfile;
-  printf("VERTEX\n")               >> namDXFfile;
-  printf("  8\n")                  >> namDXFfile;
-  printf("%s\n", typ)              >> namDXFfile;
-  printf(" 66\n")                  >> namDXFfile;
-  printf("     1\n")               >> namDXFfile;
-  printf(" 10\n")                  >> namDXFfile;
-  printf("%.1f\n", x2)             >> namDXFfile;
-  printf(" 20\n")                  >> namDXFfile;
-  printf("%.1f\n", y2 )            >> namDXFfile;
-  printf(" 30\n")                  >> namDXFfile;
-  printf("0.0\n")                  >> namDXFfile;
-  printf("  0\n")                  >> namDXFfile;
-  printf("VERTEX\n")               >> namDXFfile;
-  printf("  8\n")                  >> namDXFfile;
-  printf("%s\n", typ)              >> namDXFfile;
-  printf(" 66\n")                  >> namDXFfile;
-  printf("     1\n")               >> namDXFfile;
-  printf(" 10\n")                  >> namDXFfile;
-  printf("%.1f\n", x1)             >> namDXFfile;
-  printf(" 20\n")                  >> namDXFfile;
-  printf("%.1f\n", y1)             >> namDXFfile;
-  printf(" 30\n")                  >> namDXFfile;
-  printf("0.0\n")                  >> namDXFfile;
-  printf("  0\n")                  >> namDXFfile;
-  printf("SEQEND\n")               >> namDXFfile;
-  printf("  8\n")                  >> namDXFfile;
-  printf("%s\n", typ)              >> namDXFfile;
-  close(namDXFfile);
-}
-
-##### dxfText #####
-# erzeugt die Schriften der DXF-Datei
-function dxfText(namDXFfile, x, y, winkel, text, typ) {
-  printf("  0\n")                                    >> namDXFfile;
-  printf("TEXT\n")                                   >> namDXFfile;
-  printf("  8\n")                                    >> namDXFfile;
-  printf("%s\n", typ)                                >> namDXFfile;
-  printf(" 10\n")                                    >> namDXFfile;
-  printf("%.1f\n", x)                                >> namDXFfile;
-  printf(" 20\n")                                    >> namDXFfile;
-  printf("%.1f\n", y)                                >> namDXFfile;
-  printf(" 30\n")                                    >> namDXFfile;
-  printf("0.0\n")                                    >> namDXFfile;
-  printf(" 40\n")                                    >> namDXFfile;
-  printf("3\n")                                      >> namDXFfile;
-  printf(" 50\n")                                    >> namDXFfile;
-  printf("%d\n", winkel)                             >> namDXFfile;
-  printf("  1\n")                                    >> namDXFfile;
-  printf("%s\n", text)                               >> namDXFfile;
-  close(namDXFfile);
-}
-
-##### dxfAbschluss #####
-# beendet den Aufbau der DXF-Datei
-function dxfAbschluss(namDXFfile) {
-  printf("  0\n")       >> namDXFfile;
-  printf("ENDSEC\n")    >> namDXFfile;
-  printf("  0\n")       >> namDXFfile;
-  printf("EOF\n")       >> namDXFfile;
-  close(namDXFfile);
-}
-
 ##### ekrref #####
 # Auswertung der Formel fuer Erdkruemmung und Refraktion
-# distanz ist die Distanz in Metern
+# dist ist die Distanz in Metern
 # (1 - k): setzt sich zusammen aus 1 minus mittlerer Refraktionskoeffizient (~0.13)
-# erdRad ist der Erdradius, der mit 6370000  m festgelegt wird (gleicher Wert wie SCOP.SKYPLOT)
-function ekrref(distanz,    k, erdRad) {
+# erdR ist der Erdradius, der mit 6370000  m festgelegt wird (gleicher Wert wie SCOP.SKYPLOT)
+function ekrref(dist,    k, erdR) {
   k = 0.13;
-  erdRad = 6370000 ;
-  return (1 - k) * distanz^2 / (2 * erdRad);
+  erdR = 6370000;
+  return (1 - k) * dist^2 / (2 * erdR);
 }
 
 ##### extrempunkteNESW #####
 # bestimmt die Extrempunkte Nord, Ost, Sued und West ausgehend vom aktuell prozessierten Punkt
 # und uebertraegt zusaetzliche Informationen
-function extrempunkteNESW(xAkt, yAkt, azi, dist, hwink) {
+function extrempunkteNESW(xAkt, yAkt, azi, dist, hWink) {
   if (yAkt > exNord["y"]) {
     exNord["x"] = xAkt;
     exNord["y"] = yAkt;
     exNord["Azi"] = azi;
     exNord["Distanz"] = dist;
-    exNord["Hoehenwinkel"] = hwink;
+    exNord["Hoehenwinkel"] = hWink;
   }
   if (xAkt > exOst["x"]) {
     exOst["x"] = xAkt;
     exOst["y"] = yAkt;
     exOst["Azi"] = azi;
     exOst["Distanz"] = dist;
-    exOst["Hoehenwinkel"] = hwink;
+    exOst["Hoehenwinkel"] = hWink;
   }
   if (yAkt < exSued["y"]) {
     exSued["x"] = xAkt;
     exSued["y"] = yAkt;
     exSued["Azi"] = azi;
     exSued["Distanz"] = dist;
-    exSued["Hoehenwinkel"] = hwink;
+    exSued["Hoehenwinkel"] = hWink;
   }
   if (xAkt < exWest["x"]) {
     exWest["x"] = xAkt;
     exWest["y"] = yAkt;
     exWest["Azi"] = azi;
     exWest["Distanz"] = dist;
-    exWest["Hoehenwinkel"] = hwink;
+    exWest["Hoehenwinkel"] = hWink;
   }
 }
 
 ##### hoeheAusDistanzUndWinkel #####
 # berechnet die Hoehe eines Punktes, der durch Distanz und Hoehenwinkel von einer bekannten Hoehe definiert ist
-function hoeheAusDistanzUndWinkel(z, distanz, hoehenwinkel,    hoehe) {
-  hoehe = gegenkatheteAusHypotenuseUndWinkel(distanz, hoehenwinkel);
-  hoehe = hoehe + ekrref(distanz);
-  return hoehe = hoehe + z;
+function hoeheAusDistanzUndWinkel(z, dist, hWink,    h) {
+  h = gegenkatheteAusHypotenuseUndWinkel(dist, hWink);
+  h = h + ekrref(dist);
+  return h = h + z;
 }
 
 ##### maxDists #####
-# Bilden eines Quadrats um das Projektionszentrum im Abstand von 'maxdist'
-function maxDists(x, y, maxdist, richt) {
-  if (richt == "N")
-    return y + maxdist;
-  else if (richt == "E")
-    return x + maxdist;
-  else if (richt == "S")
-    return y - maxdist;
-  else if (richt == "W")
-    return x - maxdist;
+# Bilden eines Quadrats um das Projektionszentrum im Abstand von 'maxDist'
+function maxDists(x, y, maxDist, ri) {
+  if (ri == "N")
+    return y + maxDist;
+  else if (ri == "E")
+    return x + maxDist;
+  else if (ri == "S")
+    return y - maxDist;
+  else if (ri == "W")
+    return x - maxDist;
   else
-    abbruch("\nungueltige Angabe(n).");
+    abort("\nungueltige Angabe(n).");
 }
 
 ##### modellhoehe #####
 # einlesen der numerischen Ausgabe von Skyplot
 # ermitteln der Modellhoehe und zurueckliefern
-function modellhoehe(resultfile,    mh) {
-  while ((getline < resultfile) > 0)
+function modellhoehe(res,    mh) {
+  while ((getline < res) > 0)
     if ($0 ~ /^Model/) {
       mh = substr($0, 50, 7);
       mh = mh + 0;
     }
-  close(resultfile);  
+  close(res);  
   return mh;
 }
 
 ##### namBeschreibung #####
 # Ausgeben des genauen Namens der angegebenen Namendatei
-function namBeschreibung(namTyp) {
-  if (namTyp == "sn10.txt")
-    return "swissNames3D";
-  else if (namTyp == "sn200.txt")
-    return "swissTLM-Regio Names";
-  else if (namTyp == "sn500.txt")
-    return "DKM500 Namen";
-  else if (namTyp == "sn1000.txt")
-    return "DKM1000 Namen";
-  else if (namTyp == "sn10000.txt")
-    return "Benutzerdefinierte Namendatei";
-  else
-    abbruch("\nungueltige Namendatei.");
+function namBeschreibung(namTyp,    i) {
+  for (i = 1; i <= anzNamFiles; i++)
+    if (namTyp == namKuerz[i]  ".txt")
+      return namBeschr[i];
 }
 
 ##### namEinlesen #####
 # einlesen des angegebenen Namensfiles
-# nur Datenzeilen beruecksichtigen (solche, die mit Zahlen beginnen)
 # aus den Namen und Koordinaten die Arrays 'namName', 'namX', 'namY' und 'namZ' bilden
 # die Felder muessen mit substr extrahiert werden, weil sie in einem fixen Kolonnenformat vorliegen
 # saemtliche Werte werden auf Ganzzahlen gerundet
 # Anzahl Datenzeilen zurueckliefern
-function namEinlesen(namensfile,    i) {
+function namEinlesen(namFile,    i) {
   new(namName);
   new(namX);
   new(namY);
   new(namZ);
   i = 0;
-  while ((getline < namensfile) > 0) {
+  while ((getline < namFile) > 0) {
     i++;
     namName[i] = substr($0, 1, 32);
     namX[i] = substr($0, 37, 8);
@@ -918,13 +1013,39 @@ function namEinlesen(namensfile,    i) {
     namZ[i] = substr($0, 63, 6);
     namZ[i] = round(namZ[i]);
   }
-  close(namensfile);
+  close(namFile);
   return i;
+}
+
+##### namListeEinlesen #####
+# einlesen der Liste mit den verfuegbaren Namensfiles
+# nur Datenzeilen beruecksichtigen (Zeile 2 ff)
+# aus den 3 Feldern die Arrays 'namKuerz', 'namPfad' und 'namBeschr' bilden
+# Anzahl Datenzeilen zurueckliefern
+function namListeEinlesen(namListe,    i) {
+  new(namKuerz);
+  new(namPfad);
+  new(namBeschr);
+  i = 0;
+  while ((getline < namListe) > 0) {
+    if (i == 0) {
+      i++;
+      continue;
+    }
+    else {
+      gsub(/[ ]+$/,"",$1) # Leerzeichen am Ende entfernen
+      namKuerz[i] = $1;
+      namPfad[i] = $2;
+      namBeschr[i] = $3;
+      i++;
+    }
+  }
+  close(namListe);
+  return i - 1;
 }
 
 ##### namTmpEinlesen #####
 # einlesen des temporaeren Namensfiles
-# nur Datenzeilen beruecksichtigen (solche, die mit Zahlen beginnen)
 # aus den Daten die Arrays 'namName', 'namZ', 'namD' (Entfernung) sowie 'namX' und 'namY' fuer die Bildkoordinaten bilden
 # Anzahl Datenzeilen zurueckliefern
 function namTmpEinlesen(namTmpFile,    i) {
@@ -953,106 +1074,93 @@ function namTmpEinlesen(namTmpFile,    i) {
 
 ##### namKopieren #####
 # Namensfile ins Arbeitsverzeichnis kopieren
-function namKopieren(namFile) {
-  if (namFile == "sn10.txt")
-    system("cp $SCOP_ROOT/scop/util/SWNA/sn10.txt .");
-  else if (namFile == "sn200.txt")
-    system("cp $SCOP_ROOT/scop/util/SWNA/sn200.txt .");
-  else if (namFile == "sn500.txt")
-    system("cp $SCOP_ROOT/scop/util/SWNA/sn500.txt .");
-  else if (namFile == "sn1000.txt")
-    system("cp $SCOP_ROOT/scop/util/SWNA/sn1000.txt .");
-  else if (namFile == "sn10000.txt")
-    system("cp $SCOP_ROOT/scop/util/SWNA/sn10000.txt .");
-  else
-    abbruch("\nungueltige Namendatei.");
+function namKopieren(namTyp,    i) {
+  for (i = 1; i <= anzNamFiles; i++)
+    if (namTyp == namKuerz[i] ".txt")
+      copy(namPfad[i], ".", "angegebenes Namensfile existiert nicht");
 }
 
-##### new #####
-# erzeugt ein neues, leeres Array oder loescht den Inhalt eines bestehenden
-function new(array) {
-  split("", array);
+##### printTitel #####
+# gibt vor jeder Berechnung einen Titel in der Konsole aus
+function printTitel(vers, dat,    tit) {
+  tit = "\n\
+        ***************************************************\n\
+        *                                                 *\n\
+        *            skyplot2pano, Version " vers "            *\n\
+        *    https://github.com/ABoehlen/skyplot2pano     *\n\
+        *                                                 *\n\
+        *                   " dat "                    *\n\
+        *                                                 *\n\
+        ***************************************************\n";
+
+  print tit;
 }
 
 ##### prot #####
 # erzeugt Berechnungsprotokoll
-function prot(protfile) {
-  printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))                 > protfile;
-  printf("Berechnet von: %s\n\n\n", username())                                                  > protfile;
-  printf("%s\n", rep(90, "*"))                                                                   > protfile;
-  printf("Berechnungsprotokoll %s\n", name)                                                      > protfile;
-  printf("skyplot2pano v%s, https://github.com/ABoehlen/skyplot2pano\n", version)                > protfile;
-  printf("%s\n", rep(90, "*"))                                                                   > protfile;
-  printf("\n\nEingabe\n")                                                                        > protfile;
-  printf("%s\n\n", rep(7, "*"))                                                                  > protfile;
-  printf("Standort                            :  %d / %d / %d\n", x, y, z)                       > protfile;
-  printf("Name                                :  %s\n", name)                                    > protfile;
-  printf("Azimut links                        :  %d gon\n", aziLi)                               > protfile;
-  printf("Azimut rechts                       :  %d gon\n", aziRe)                               > protfile;
-  printf("Azimutale Aufloesung                :  %.3f gon\n", aufloesAzi)                        > protfile;
-  printf("Bildbreite                          :  %d mm\n", bildbr)                               > protfile;
-  printf("Verwendetes Hoehenmodell            :  %s\n", dhmBeschreibung(dhm))                    > protfile;
+function prot(protFile, vers) {
+  printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))                 > protFile;
+  printf("Berechnet von: %s\n\n\n", username())                                                  > protFile;
+  printf("%s\n", rep(90, "*"))                                                                   > protFile;
+  printf("Berechnungsprotokoll %s\n", name)                                                      > protFile;
+  printf("skyplot2pano v%s, https://github.com/ABoehlen/skyplot2pano\n", vers)                   > protFile;
+  printf("%s\n", rep(90, "*"))                                                                   > protFile;
+  printf("\n\nEingabe\n")                                                                        > protFile;
+  printf("%s\n\n", rep(7, "*"))                                                                  > protFile;
+  printf("Standort (X / Y / Z)                :  %d / %d / %d\n", x, y, z)                       > protFile;
+  printf("Name                                :  %s\n", name)                                    > protFile;
+  printf("Azimut links                        :  %d gon\n", aziLi)                               > protFile;
+  printf("Azimut rechts                       :  %d gon\n", aziRe)                               > protFile;
+  printf("Azimutale Aufloesung                :  %.3f gon\n", aufloesAzi)                        > protFile;
+  printf("Bildbreite                          :  %d mm\n", bildbr)                               > protFile;
+  printf("Verwendetes Hoehenmodell            :  %s\n", dhmBeschreibung(dhm))                    > protFile;
   if (namFile != "0")                                                                            
-    printf("Verwendete Namendatei               :  %s\n", namBeschreibung(namFile))              > protfile;
-  printf("Berechnungen ab                        %d km\n", minDist / 1000)                       > protfile;
-  printf("   bis                                 %d km\n", maxDist / 1000)                       > protfile;
-  printf("   im Abstand von                      %d m durchgefuehrt\n", aufloesDist)             > protfile;
-  printf("\n\n\nAbgeleitete Parameter\n")                                                        > protfile;
-  printf("%s\n\n", rep(21, "*"))                                                                 > protfile;
-  printf("Eingegebene Hoehe                   :  %.1f m\n", z)                                   > protfile;
-  printf("Interpolierte Hoehe im %-13s:  %.1f m\n", toupper(dhm), mhoehe)                        > protfile;
-  printf("Differenz                           :  %.1f m\n", z - mhoehe)                          > protfile;
-  printf("Oeffnungswinkel                     :  %d gon\n", aziRe - aziLi)                       > protfile;
-  printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                              > protfile;
-  printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)                    > protfile;
-  printf("Anzahl Berechnungen                 :  %d\n", anzBer)                                  > protfile;
-  printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                        > protfile;
-  printf("\n\n\nTopographische Extrempunkte\n")                                                  > protfile;
-  printf("%s\n\n", rep(27, "*"))                                                                 > protfile;
+    printf("Verwendete Namendatei               :  %s\n", namBeschreibung(namFile))              > protFile;
+  printf("Berechnungen ab                        %d km\n", minDist / 1000)                       > protFile;
+  printf("   bis                                 %d km\n", maxDist / 1000)                       > protFile;
+  printf("   im Abstand von                      %d m durchgefuehrt\n", aufloesDist)             > protFile;
+  printf("\n\n\nAbgeleitete Parameter\n")                                                        > protFile;
+  printf("%s\n\n", rep(21, "*"))                                                                 > protFile;
+  printf("Eingegebene Hoehe                   :  %.1f m\n", z)                                   > protFile;
+  printf("Interpolierte Hoehe im %-13s:  %.1f m\n", toupper(dhm), mhoehe)                        > protFile;
+  printf("Differenz zum Hoehenmodell          :  %.1f m\n", z - mhoehe)                          > protFile;
+  printf("Oeffnungswinkel                     :  %d gon\n", aziRe - aziLi)                       > protFile;
+  printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                              > protFile;
+  printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)                    > protFile;
+  printf("Anzahl Berechnungen                 :  %d\n", anzBer)                                  > protFile;
+  printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                        > protFile;
+  printf("\n\n\nTopographische Extrempunkte\n")                                                  > protFile;
+  printf("%s\n\n", rep(27, "*"))                                                                 > protFile;
   printf("Extrempunkt    " formatProtTxt,\
-    "X", "Y", "Z", "D [km]", "Azi [gon]", "E-R [m]", "dH [m]")                                   > protfile;
-  printf("%s\n", rep(68, "-"))                                                                   > protfile;
+    "X", "Y", "Z", "D [km]", "Azi [gon]", "E-R [m]", "dH [m]")                                   > protFile;
+  printf("%s\n", rep(68, "-"))                                                                   > protFile;
 
   printf("Noerdlichster: " formatProtDat,\
-    exNord["x"], exNord["y"], exNord["z"], exNord["Distanz"] / 1000, exNord["Azi"], ekrref(exNord["Distanz"]), exNord["z"] - z) > protfile;
+    exNord["x"], exNord["y"], exNord["z"], exNord["Distanz"] / 1000, exNord["Azi"], ekrref(exNord["Distanz"]), exNord["z"] - z) > protFile;
   printf("Oestlichster:  " formatProtDat,\
-    exOst["x"], exOst["y"], exOst["z"], exOst["Distanz"] / 1000, exOst["Azi"], ekrref(exOst["Distanz"]), exOst["z"] - z)        > protfile;
+    exOst["x"], exOst["y"], exOst["z"], exOst["Distanz"] / 1000, exOst["Azi"], ekrref(exOst["Distanz"]), exOst["z"] - z)        > protFile;
   printf("Suedlichster:  " formatProtDat,\
-    exSued["x"], exSued["y"], exSued["z"], exSued["Distanz"] / 1000, exSued["Azi"], ekrref(exSued["Distanz"]), exSued["z"] - z) > protfile;
+    exSued["x"], exSued["y"], exSued["z"], exSued["Distanz"] / 1000, exSued["Azi"], ekrref(exSued["Distanz"]), exSued["z"] - z) > protFile;
   printf("Westlichster:  " formatProtDat,\
-    exWest["x"], exWest["y"], exWest["z"], exWest["Distanz"] / 1000, exWest["Azi"], ekrref(exWest["Distanz"]), exWest["z"] - z) > protfile;
+    exWest["x"], exWest["y"], exWest["z"], exWest["Distanz"] / 1000, exWest["Azi"], ekrref(exWest["Distanz"]), exWest["z"] - z) > protFile;
   printf("Hoechster:     " formatProtDat,\
-    xyHoe[1], xyHoe[2], exHoe["z"], exHoe["Distanz"] / 1000, exHoe["Azi"], ekrref(exHoe["Distanz"]), exHoe["z"] - z)            > protfile;
+    xyHoe[1], xyHoe[2], exHoe["z"], exHoe["Distanz"] / 1000, exHoe["Azi"], ekrref(exHoe["Distanz"]), exHoe["z"] - z)            > protFile;
   printf("Entferntester: " formatProtDat,\
-    xyEntf[1], xyEntf[2], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z)     > protfile;
-}
-
-##### rep #####
-# erzeugt n Zeichen vom Typ 's' und liefert sie zurueck
-function rep(n, s,    t) {
-  while (n-- > 0)
-    t = t s;
-  return t;
-}
-
-##### round #####
-# rundet angegebene Fliesskommazahl auf die naechste Ganzzahl
-function round(float) {
-  return int(float + 0.5);
+    xyEntf[1], xyEntf[2], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z)     > protFile;
 }
 
 ##### skyplot #####
 # erzeugt das CMD-File fuer die Skyplot-Berechnung
-function skyplot(output, resultfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, name) {
+function skyplot(output, res, x, y, z, W, S, E, N, auflAzi, aziLi, aziRe, name) {
   printf("SKYPLOT,POSITION=(%s,%s),\n", x, y)                        > output;
   printf("        HEIGHT=%s,\n", z)                                  > output;
   printf("        RDHFILE=(sky.rdh),\n")                             > output;
   printf("        LIMITS=(%d %d %d %d),\n", W, S, E, N)              > output;
-  printf("        RESOLUTION=GRADES=%s,\n", aufloesAzi)              > output;
+  printf("        RESOLUTION=GRADES=%s,\n", auflAzi)                 > output;
   printf("        SECTOR=(%d,%d),\n", aziLi, aziRe)                  > output;
   printf("        TITEL=(%s),\n", name)                              > output;
   printf("        PLOTTER=113,\n")                                   > output;
-  printf("        RESULTFILE=(%s);\n", resultfile)                   > output;
+  printf("        RESULTFILE=(%s);\n", res)                          > output;
   printf("STOP;\n")                                                  > output;
   printf("$A;\n")                                                    > output;
   close(output);
@@ -1065,12 +1173,12 @@ function skyplot(output, resultfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, azi
 # die Felder muessen mit substr extrahiert werden, weil sie direkt aneinander grenzen
 # die Addition mit 0 erzwingt die Konvertierung in eine Zahl
 # Anzahl Datenzeilen zurueckliefern
-function skyplotEinlesen(resultfile,    i) {
+function skyplotEinlesen(res,    i) {
   new(azi);
   new(hoehenwinkel);
   new(distanz);
   i = 0;
-  while ((getline < resultfile) > 0)
+  while ((getline < res) > 0)
     if ($1 ~ /^[1-9 ]/) {
       i++;
       azi[i] = substr($0, 1, 8);
@@ -1080,12 +1188,12 @@ function skyplotEinlesen(resultfile,    i) {
       distanz[i] = substr($0, 18, 8);
       distanz[i] = distanz[i] + 0;
     }
-  close(resultfile);
+  close(res);
   return i;
 }
 
 ##### theoausweit #####
-# Naeherungsformel fÃ¼r die Berechnung der theoretischen Aussichtsweite eines Punktes in Metern
+# Naeherungsformel für die Berechnung der theoretischen Aussichtsweite eines Punktes in Metern
 # (1 - k): setzt sich zusammen aus 1 minus mittlerer Refraktionskoeffizient (~0.13)
 # erdRad ist der Erdradius, der mit 6370000  m festgelegt wird (gleicher Wert wie SCOP.SKYPLOT)
 function theoausweit(z,    k, erdRad) {
@@ -1096,7 +1204,8 @@ function theoausweit(z,    k, erdRad) {
 
 ##### usage #####
 # gibt aus, wie das Programm parametrisiert werden muss
-function usage() {
+function usage(vers) {
+  printf("\nskyplot2pano v%s, https://github.com/ABoehlen/skyplot2pano\n", vers)
   printf("\n%s\n", rep(141, "*"));
   printf("  Usage: skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufl-Azi> <Azi li> <Azi re> <Bildbr> <Min-Dist> <Max-Dist> <Aufloes-Dist> <Nam> <Tol>\n");
   printf("%s\n\n", rep(141, "*"));
@@ -1104,13 +1213,11 @@ function usage() {
   printf("\n");
   printf("Erlaeuterung der Argumente\n");
   printf("%s\n", rep(26, "-"));
-  printf("<X> <Y> <Z> definieren das Projektionszentrum (PZ) in Landeskoordinaten LV03 und Hoehe in m ue M.\n");
+  printf("<X> <Y> <Z> definieren das Projektionszentrum (PZ) in rechtwinkligen Koordinaten und Hoehe in m ue M.\n");
   printf("<Name> ist der Name des PZ. Er darf keine Leerzeichen enthalten.\n");
   printf("<DHM> ist das zu verwendende digitale Hoehenmodell. Folgende stehen zur Verfuegung:\n");
-  printf("   alti25  (hochpraezises digitales Hoehenmodell der Schweiz und Liechtensteins (reduziert auf 25 m Aufloesung)\n");
-  printf("   dhm25   (kartenbasiertes digitales Hoehenmodell der Schweiz und umliegender Gebiete mit 25 m Aufloesung)\n");
-  printf("   srtm    (SRTM-Mosaik der Alpen mit ca. 30 m Aufloseung)\n");
-  printf("   euD     (euroDEM, das europaeische Hoehenmodell mit ca. 60 m  Aufloesung)\n");
+  for (i = 1; i <= anzDhm; i++)
+    printf("   %-15s%s\n", dhmKuerz[i], dhmBeschr[i]);
   printf("<Auf-Azi> ist die azimutale Aufloesung in gon.\n");
   printf("<Azi li> und <Azi re> sind das ganzzahlige linke und rechte Azimut in gon.\n");
   printf("<Bildbr> ist die ganzzahlige gewuenschte Bildbreite in mm.\n");
@@ -1118,29 +1225,18 @@ function usage() {
   printf("<Max-Dist> definiert, bis zu welcher Distanz in km (Ganzzahl) vom Projektionszentrum die Berechnung vorgenommen wird.\n");
   printf("<Aufloes-Dist> definiert, in welchen Intervallen (km-Abstand zu <Min-Dist>) Berechnungen durchgefuehrt werden, bis <Max-Dist> erreicht ist.\n");
   printf("<Nam> definiert, ob und aufgrund welcher Namendatei die Beschriftung vorgenommen werden soll. Folgende stehen zur Verfuegung:\n");
-  printf("   0       (keine Beschriftung)\n");
-  printf("   sn10    (swissNames3D)\n");
-  printf("   sn200   (swissTLM-Regio Names)\n");
-  printf("   sn500   (DKM500 Namen)\n");
-  printf("   sn1000  (DKM1000 Namen)\n");
-  printf("   sn10000 (benutzerdefinierte Namendatei)\n");
-  printf("<Tol> ist die Toleranz in m innerhalb der bei berechneten Punkten nach Namen im Namensfile gesucht werden soll.\n");
+  printf("   %-15s%s\n", "0", "keine Beschriftung");
+  for (i = 1; i <= anzNamFiles; i++)
+    printf("   %-15s%s\n", namKuerz[i], namBeschr[i]);
+  printf("<Tol> ist die Toleranz in m, innerhalb der bei berechneten Punkten nach Namen im Namensfile gesucht werden soll.\n");
   printf("\n");
   printf("Beispiel\n");
   printf("%s\n", rep(8, "-"));
   printf("  skyplot2pano.awk 610558 197236 635 Gantrischweg dhm25 0.1 200 250 400 0 40 1 sn200 50\n");
 }
 
-##### username #####
-# ermittelt mit UNIX-Kommando den Usernamen und gibt ihn zurueck
-function username(    cmd) {
-  cmd = "whoami";
-  cmd | getline user;
-  close(cmd);
-  return user;
-}
+########## Funktionen fuer die geometrischen Berechnungen ##########
 
-##### Funktionen fuer die geometrischen Berechnungen #####
 function pi() {
   return atan2(0, -1);
 }
