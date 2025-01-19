@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         22.12.2024
-# Version:      2.0
+# Date:         08.01.2025
+# Version:      2.1
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -29,7 +29,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.0";
+  version = "2.1";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -58,8 +58,8 @@ BEGIN {
     # diverse Variablen initialisieren
     formatExtrTxt = "%7s, %7s, %4s, %-15s\n";
     formatExtrDat = "%7d, %7d, %4d, %-15s\n";
-    formatSilTxt =  "%7s, %7s, %7s, %7s, %6s, %8s, %5s, %5s, %6s, %5s\n";
-    formatSilDat =  "%7.3f, %7.3f, %7d, %7d, %6d, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
+    formatSilTxt =  "%7s, %7s, %7s, %7s, %6s, %16s, %8s, %5s, %5s, %6s, %5s\n";
+    formatSilDat =  "%7.3f, %7.3f, %7d, %7d, %6d, %16s, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
     formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
     formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
     formatNamTmp =  "%s, %d, %d, %d, %d\n";
@@ -154,7 +154,7 @@ BEGIN {
 
     # Panoramadatei vorbereiten
     panofile = "sil_" name "_" aziLi "-" aziRe ".txt"
-    printf(formatSilTxt, "X", "Y", "LageX", "LageY", "LageZ", "Dist", "Azi", "HWink", "Limit", "DiRel") > panofile;
+    printf(formatSilTxt, "X", "Y", "LageX", "LageY", "LageZ", "LageX LageY", "Dist", "Azi", "HWink", "Limit", "DiRel") > panofile;
 
     # Namen-Ausgabedateien vorbereiten
     if (namFile != "0") {
@@ -371,7 +371,7 @@ BEGIN {
             xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
             # Punkt in Panoramadatei schreiben
             distRel = round((i - minDist) / distRelDiv);
-            printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panofile;
+            printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], xyPt[1] " "  xyPt[2], distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panofile;
 
             # minimale und maximale Bildkoordinaten aktualisieren
             if (abstX < minX)
