@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         08.01.2025
-# Version:      2.1
+# Date:         05.02.2025
+# Version:      2.2
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -29,7 +29,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.1";
+  version = "2.2";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -387,22 +387,24 @@ BEGIN {
             # und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
             if (namFile != "0") {
               for (nam = 1; nam <= anzNam; nam++) {
-                # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten suchen
-                if ((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) {
-                  if ((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) {
+                # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten oder Namenscode 99 suchen
+                if (((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) || namCode[nam] == 99) {
+                  if (((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) || namCode[nam] == 99) {
                     nameHoehe = namName[nam] namZ[nam]; # Name und Hoehe als String konkatenieren, zwecks Eindeutigkeit
                     for (m in bisherigeNamen)
                       if (nameHoehe == bisherigeNamen[m])
                         existiertNam = 1;
                     # Name mit relevanten Informationen in temporaere Textdatei schreiben, sofern nicht bereits vorhanden
+                    # Distanz zu jedem Namenspunkt berechnen
                     if (existiertNam == 0) {
                       namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM);
                       namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
-                      printf(formatNamTmp, namName[nam], namZ[nam], distanz[j], namAbstX, namAbstY) > namTmpFile;
+                      namDist = distanzEbene(x, y, namX[nam], namY[nam]);
+                      printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY) > namTmpFile;
                     }
                     else
                       existiertNam = 0;
-                    bisherigeNamen[m] = nameHoehe; # aktueller Name ins Array eintragen
+                    bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
                   }
                 }
               }
@@ -994,24 +996,27 @@ function namBeschreibung(namTyp,    i) {
 ##### namEinlesen #####
 # einlesen des angegebenen Namensfiles
 # aus den Namen und Koordinaten die Arrays 'namName', 'namX', 'namY' und 'namZ' bilden
+# den Code ins Array 'namCode' einlesen
 # die Felder muessen mit substr extrahiert werden, weil sie in einem fixen Kolonnenformat vorliegen
-# saemtliche Werte werden auf Ganzzahlen gerundet
+# Werte werden auf Ganzzahlen gerundet
 # Anzahl Datenzeilen zurueckliefern
 function namEinlesen(namFile,    i) {
   new(namName);
   new(namX);
   new(namY);
   new(namZ);
+  new(namCode);
   i = 0;
   while ((getline < namFile) > 0) {
     i++;
     namName[i] = substr($0, 1, 32);
-    namX[i] = substr($0, 37, 8);
-    namX[i] = round(namX[i]);
-    namY[i] = substr($0, 49, 8);
-    namY[i] = round(namY[i]);
-    namZ[i] = substr($0, 63, 6);
-    namZ[i] = round(namZ[i]);
+    namX[i] =    substr($0, 37, 8);
+    namX[i] =    round(namX[i]);
+    namY[i] =    substr($0, 49, 8);
+    namY[i] =    round(namY[i]);
+    namZ[i] =    substr($0, 63, 6);
+    namZ[i] =    round(namZ[i]);
+    namCode[i] = substr($0, 71, 2);
   }
   close(namFile);
   return i;
