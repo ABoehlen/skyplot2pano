@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         25.04.2025
-# Version:      2.2
+# Date:         27.04.2025
+# Version:      2.3
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -29,7 +29,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.2";
+  version = "2.3";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -401,10 +401,10 @@ BEGIN {
                       namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
                       namDist = distanzEbene(x, y, namX[nam], namY[nam]);
                       printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY) > namTmpFile;
+                      bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
                     }
                     else
                       existiertNam = 0;
-                    bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
                   }
                 }
               }
@@ -450,16 +450,16 @@ BEGIN {
       dxfHeader(namDXFFile, minX, minY, maxX, maxY + erwOben);
       dxfInhaltBeginn(namDXFFile);
 
-      dxfLinienInhalt(namDXFFile, minX, 0, 10, 0, "HORIZONT");        # Horizontlinie links
-      dxfLinienInhalt(namDXFFile, maxX - 10, 0, maxX, 0, "HORIZONT"); # Horizontlinie rechts
+      dxfLinienInhalt(namDXFFile, minX, 0, 20, 0, "HORIZONT");        # Horizontlinie links
+      dxfLinienInhalt(namDXFFile, maxX - 20, 0, maxX, 0, "HORIZONT"); # Horizontlinie rechts
 
       dxfLinienInhalt(namDXFFile, minX, minY, minX, maxY + erwOben, "RAHMEN");           # vertikale Linie links
       dxfLinienInhalt(namDXFFile, maxX, minY, maxX, maxY + erwOben, "RAHMEN");           # vertikale Linie rechts
       dxfLinienInhalt(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
       dxfLinienInhalt(namDXFFile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
 
-      dxfText(namDXFFile, minX + 3, 1, 0 , "H", "HORIZONT"); # Text "H" links
-      dxfText(namDXFFile, maxX - 6, 1, 0 , "H", "HORIZONT"); # Text "H" rechts
+      dxfText(namDXFFile, minX + 3, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" links
+      dxfText(namDXFFile, maxX - 16, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" rechts
 
       for (i = 1; i <= anzNam; i++)
         dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
@@ -480,7 +480,7 @@ BEGIN {
     ##### Berechnungsprotokoll erstellen #####
     protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
     prot(protokoll, version);
-	close(protokoll);
+    close(protokoll);
 
     ##### aufraeumen und beenden #####
     system("rm -f dhm.txt");
