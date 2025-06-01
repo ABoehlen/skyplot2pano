@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         27.04.2025
-# Version:      2.3
+# Date:         01.06.2025
+# Version:      2.5
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -23,13 +23,17 @@
 #
 #########################################################################################################################################################
 
+##########################
+########## main ##########
+##########################
+
 BEGIN {
 
   # Zeitstempel Beginn
   start = systime();
   
   # Versionsnummer
-  version = "2.3";
+  version = "2.5";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -50,462 +54,513 @@ BEGIN {
     exit;
   }
   else {
-    ##### vorbereiten #####
 
     # Programmtitel ausgeben
     printTitel(version, strftime("%d.%m.%Y", systime()));
 
-    # diverse Variablen initialisieren
-    formatExtrTxt = "%7s, %7s, %4s, %-15s\n";
-    formatExtrDat = "%7d, %7d, %4d, %-15s\n";
-    formatSilTxt =  "%7s, %7s, %7s, %7s, %6s, %16s, %8s, %5s, %5s, %6s, %5s\n";
-    formatSilDat =  "%7.3f, %7.3f, %7d, %7d, %6d, %16s, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
-    formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
-    formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
-    formatNamTmp =  "%s, %d, %d, %d, %d\n";
-    anzBer = 0; # Anzahl Berechnungen pro Panoramabild
-    anzPte = 0; # Anzahl Azimute pro Berechnung
+    # Variablen initialisieren
+    initVar();
 
-    # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
-    x = ARGV[1];
-    y = ARGV[2];
-    z = ARGV[3];
-    name = ARGV[4];
-    dhm = ARGV[5];
-    aufloesAzi = ARGV[6];
-    aziLi = ARGV[7];
-    aziLi = round(aziLi);
-    aziRe = ARGV[8];
-    aziRe = round(aziRe);
-    bildbr = ARGV[9];
-    bildbr = round(bildbr);
-    minDist = ARGV[10] * 1000;
-    minDist = round(minDist);
-    maxDist = ARGV[11] * 1000;
-    maxDist = round(maxDist);
-    aufloesDist = ARGV[12] * 1000;
-    aufloesDist = round(aufloesDist);
+    # Argumente einlesen
+    argEinl();
 
-    # Namendatenfile kopieren falls gewuenscht
-    namFile = ARGV[13];
-    if (namFile != "0") {
-      namFile = namFile ".txt";
-      namKopieren(namFile);
-      toleranz = ARGV[14];
-      toleranz = round(toleranz);
-    }
+    # Argumente pruefen
+    argPr();
 
-    # Array zuruecksetzen, damit Argumente nicht als Files interpretiert werden
-    ARGV[1] = "";
-    ARGV[2] = "";
-    ARGV[3] = "";
-    ARGV[4] = "";
-    ARGV[5] = "";
-    ARGV[6] = "";
-    ARGV[7] = "";
-    ARGV[8] = "";
-    ARGV[9] = "";
-    ARGV[10] = "";
-    ARGV[11] = "";
-    ARGV[12] = "";
-    ARGV[13] = "";
-    ARGV[14] = "";
+    # Daten vorbereiten
+    datVorb();
 
-    # Usage ausgeben, wenn zuviele Argumente
-    if (ARGV[15] != "") {
-      usage();
-      system("rm -f dhm.txt");
-      system("rm -f nam.txt");
-      exit;
-    }
+    # Berechnen der Extrempunkte
+    extrBer();
 
-    # Plausibilitaet der Argumente pruefen. Andernfalls Fehlermeldung ausgeben und beenden
-    if (aziLi < -400 || aziLi > 400)
-      abort("\nlinkes Azimut muss zwischen -400 und +400 gon betragen.");
+    # Berechnen des Panoramas
+    panoBer();
 
-    if (aziRe < -400 || aziRe > 400)
-      abort("\nrechtes Azimut muss zwischen -400 und +400 gon betragen.");
-
-    if (aziLi >= aziRe)
-      abort("\nlinkes Azimut muss kleiner sein als rechtes Azimut.");
-
-    if (minDist < 0)
-      abort("\ndie minimale Distanz kann nicht kleiner als 0 sein.");
-
-    if (minDist >= maxDist)
-      abort("\ndie minimale Distanz muss kleiner als die maximale Distanz sein.");
-
-    # Hoehenmodell als sky.rdh kopieren
-    dhmKopieren(dhm, "sky.rdh");
-
-    # Oeffnungswinkel bestimmen
-    # 1 gon im Bildkoordinatensystem ermitteln
-    oeffWink = aziRe - aziLi;
-    gonInMM = bildbr / oeffWink;
-
-    # ausgehend von einer Zylinderprojektion wird der Umfang
-    # und der Radius des Projektionszylinders abgeleitet
-    umfang = 400 / oeffWink * bildbr;
-    radPr = umfang / (2 * pi());
-
-    # Extrempunktedatei vorbereiten
-    extrfile = "extr_" name "_" aziLi "-" aziRe ".txt"
-    printf(formatExtrTxt, "X", "Y", "Z", "Extrempunkt") > extrfile;
-
-    # Panoramadatei vorbereiten
-    panofile = "sil_" name "_" aziLi "-" aziRe ".txt"
-    printf(formatSilTxt, "X", "Y", "LageX", "LageY", "LageZ", "LageX LageY", "Dist", "Azi", "HWink", "Limit", "DiRel") > panofile;
-
-    # Namen-Ausgabedateien vorbereiten
-    if (namFile != "0") {
-      namTmpFile = "namTmp.txt"
-      namDXFFile = "nam_" name "_" aziLi "-" aziRe ".dxf"
-      print "\n...Berechnung mit Namen...\n";
-    }
-    else
-      print "\n...Berechnung ohne Namen...\n";
-
-    # aus 'minDist' und 'maxDist' einen Hilfswert ableiten, um spaeter die einzelnen Punkte den
-    # relative Werten 0 bis 10 zuzuweisen (0 = naheliegendst, 10 = entferntest)
-    distRelDiv = (maxDist - minDist) / 10;
-
-
-    ###########################################
-    ##### 1. Teil: Extrempunkte berechnen #####
-    ###########################################
-    
-    # Arrays zur Speicherung der Extrempunkte initialisieren
-    exEntf["Distanz"] = 0;
-    exHoe["z"] = 0;
-    exNord["x"] = exOst["x"] = exSued["x"] = exWest["x"] = x;
-    exNord["y"] = exOst["y"] = exSued["y"] = exWest["y"] = y;
-
-    # Theoretische Aussichtsweite ermitteln
-    maxSicht = theoausweit(z);
-
-    # bei geringer theoretischen Aussichtsweite (niedriges Projektionszentrum) den Wert auf 100 km festlegen 
-    if (maxSicht < 100000)
-      maxSicht = 100000;
-
-    # SCOP LIMITS im Abstand des doppelten zuvor ermittelten Wertes festlegen
-    N = maxDists(x, y, (maxSicht * 2), "N");
-    E = maxDists(x, y, (maxSicht * 2), "E");
-    S = maxDists(x, y, (maxSicht * 2), "S");
-    W = maxDists(x, y, (maxSicht * 2), "W");
-
-    # Erstellen des SCOP-Input-Files SKYPLOT.CMD fuer die Berechnung der Extrempunkte
-    resfile = "extr.txt";
-    skyplot("SKYPLOT.CMD", resfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, "Extrempunkte");
-    
-    # Starten von skyplot und Unterdruecken der Ausgabe
-    print "Berechnung der Extrempunkte...";
-    system("skyplot < SKYPLOT.CMD > /dev/null");
-
-    # Modellhoehe ermitteln
-    mhoehe = modellhoehe(resfile);
-
-    # numerische Ausgabe von Skyplot einlesen
-    maxRec = skyplotEinlesen(resfile);
-
-    # rekonstruieren der azimutalen Aufloesung in gon. Die azimutale Aufloesung kann nicht beliebig klein sein
-    # und haengt vom Oeffnungswinkel ab.
-    # Damit die Darstellung auch dann korrekt erstellt wird, wenn ein zu kleiner Wert eingegeben wird,
-    # muss die tatsaechliche azimutale Aufloesung nachtraeglich aus der numerischen Ausgabe rekonstruiert werden.
-    aufloesAziCalc = oeffWink / (maxRec - 1);
-    
-    # jeden horizontbildenden Punkt auswerten zwecks Bestimmung der Extrempunkte
-    for (i = 1; i <= maxRec; i++ ) {
-    
-      ##### Entferntester Punkt ermitteln #####
-      
-      if (distanz[i] > exEntf["Distanz"]) {
-        exEntf["Azi"] = azi[i];
-        exEntf["Distanz"] = distanz[i];
-        exEntf["Hoehenwinkel"] = hoehenwinkel[i];
-      }
-
-      ##### Hoechster Punkt ermitteln #####
-
-      hoehe = hoeheAusDistanzUndWinkel(z, distanz[i], hoehenwinkel[i]);
-      if (hoehe > exHoe["z"]) {
-        exHoe["z"] = hoehe;
-        exHoe["Azi"] = azi[i];
-        exHoe["Distanz"] = distanz[i];
-        exHoe["Hoehenwinkel"] = hoehenwinkel[i];
-      }
-      
-      ##### Extrempunkte N, E, S, W ermitteln #####
-      
-      # Distanz in der Ebene (math. Horizont) ermitteln
-      dist0 = ankatheteAusHypotenuseUndWinkel(distanz[i], hoehenwinkel[i]);
-      
-      split(bestimmeXY(x, y, dist0, azi[i]), xyAkt, " ")
-      if (xyAkt[1] == -1)
-        abort("\nungueltiges Azimut.");
-      else
-        extrempunkteNESW(xyAkt[1], xyAkt[2], azi[i], distanz[i], hoehenwinkel[i]);
-
-    }
-
-    # Z Koordinate der Extrempunkte N, E, S, W bestimmen
-    exNord["z"] = hoeheAusDistanzUndWinkel(z, exNord["Distanz"], exNord["Hoehenwinkel"]);
-    exOst["z"] =  hoeheAusDistanzUndWinkel(z, exOst["Distanz"],  exOst["Hoehenwinkel"]);
-    exSued["z"] = hoeheAusDistanzUndWinkel(z, exSued["Distanz"], exSued["Hoehenwinkel"]);
-    exWest["z"] = hoeheAusDistanzUndWinkel(z, exWest["Distanz"], exWest["Hoehenwinkel"]);
-    
-    # X/Y/Z Koordinaten des entferntesten Punktes bestimmen
-    dist0 = ankatheteAusHypotenuseUndWinkel(exEntf["Distanz"], exEntf["Hoehenwinkel"]);
-    if (split(bestimmeXY(x, y, dist0, exEntf["Azi"]), xyEntf, " ") == -1)
-      abort("\nungueltiges Azimut.");
-    exEntf["z"] = hoeheAusDistanzUndWinkel(z, exEntf["Distanz"], exEntf["Hoehenwinkel"]);
-
-    # X/Y Koordinaten des hoechsten Punktes bestimmen
-    dist0 = ankatheteAusHypotenuseUndWinkel(exHoe["Distanz"], exHoe["Hoehenwinkel"]);
-    if (split(bestimmeXY(x, y, dist0, exHoe["Azi"]), xyHoe, " ") == -1)
-      abort("\nungueltiges Azimut.");
-
-    # Extrempunkte in CSV-Datei schreiben
-    printf(formatExtrDat, exNord["x"], exNord["y"], exNord["z"], "Noerdlichster") > extrfile;
-    printf(formatExtrDat, exOst["x"], exOst["y"], exOst["z"], "Oestlichster")     > extrfile;
-    printf(formatExtrDat, exSued["x"], exSued["y"], exSued["z"], "Suedlichster")  > extrfile;
-    printf(formatExtrDat, exWest["x"], exWest["y"], exWest["z"], "Westlichster")  > extrfile;
-    printf(formatExtrDat, xyHoe[1], xyHoe[2], exHoe["z"], "Hoechster")            > extrfile;
-    printf(formatExtrDat, xyEntf[1], xyEntf[2], exEntf["z"], "Entferntester")     > extrfile;
-    close(extrfile);
-
-    # aufraeumen
-    system("rm -f " resfile);
-    system("rm -f SKYPLOT.CMD");
-
-    ###########################################
-    ####### 2. Teil: Panorama berechnen #######
-    ###########################################
-
-    # Variablen zum Speichern der Punkte und Namen einrichten
-    new(bisherigePte);
-    new(bisherigeNamen);
-    existiertPkt = 0;
-    existiertNam = 0;
-
-    # Namendaten einlesen, wenn spezifiziert
+    # Berechnen des Namen-DXF
     if (namFile != "0")
-      anzNam = namEinlesen(namFile);
+      dxfBer();
 
-    # um fehlerhafte Resultate zu vermeiden, muss der unmittelbare Nahbereich unterdrueckt werden
-    if (minDist < 500)
-      minDist = 500;
-
-    # Berechnungen im Abstand von 'aufloesDist' durchfuehren, bis 'maxDist' erreicht ist
-    for (i = minDist; i <= maxDist; i += aufloesDist) {
-
-      anzBer++; # Zaehler fuer die Anzahl Berechnungen
-
-      # SCOP LIMITS festlegen
-      N = maxDists(x, y, i, "N");
-      E = maxDists(x, y, i, "E");
-      S = maxDists(x, y, i, "S");
-      W = maxDists(x, y, i, "W");
-
-      # Erstellen des SCOP-Input-Files SKYPLOT.CMD
-      resfile = "sky_" name i ".txt";
-      skyplot("SKYPLOT.CMD", resfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, name);
-
-      # Starten von skyplot und Unterdruecken der Ausgabe
-      printf("Berechnung zu %.1f%% abgeschlossen\n", (i - minDist) * 100 / (maxDist - minDist));
-      system("skyplot < SKYPLOT.CMD > /dev/null");
-
-      # numerische Ausgabe von Skyplot einlesen und Anzahl Datenzeilen speichern
-      maxRec = skyplotEinlesen(resfile);
-
-      # am linken Bildrand beginnen
-      abstX = 0;
-      if (anzBer == 1) {
-        minX = abstX; # minimale X-Koordinate bei erster Berechnung initialisieren
-        maxX = abstX; # maximale X-Koordinate bei erster Berechnung initialisieren
-      }
-
-      # X/Y in Bildkoordinaten fuer jeden Eintrag der Skyplot-Ausgabe berechnen
-      # der horizontale Abstand der Punkte entspricht einem gon im Bildkoordinatensystem...
-      # ...multipliziert mit der azimutalen Aufloesung in gon
-      # der vertikale Abstand der Punkte entspricht der Gegenkathete, wenn der
-      # Projektionszylinderradius als Ankathete und der Hoehenwinkel als Alpha betrachtet wird
-      for (j = 1; j <= maxRec; j++ ) {
-
-        distDHMrand = distGre(i, azi[j]);
-
-        if (distDHMrand == -1)
-          abort("\nungueltiges Azimut.");
-
-        # Distanz zur Begrenzung des Hoehenmodell-Ausschnitts geringfuegig reduzieren
-        distDHMrand = int(distDHMrand) - 200;
-
-        # Ist die Entfernung des Grenzpunktes der Sichtbarkeit gleich oder groesser der Begrenzung des Hoehenmodell-
-        # Ausschnitts, muss dieser Punkt ignoriert werden, da er keine Gelaendekante, sondern nur den Rand des
-        # Hoehenmodell-Ausschnittes repraesentiert.	Die X-Koordinate muss dennoch einen Schritt erhoeht werden.
-        if (distanz[j] >= distDHMrand) {
-          abstX = abstX + (gonInMM * aufloesAziCalc);
-          continue;
-        }
-        # andernfalls wird geprueft, ob an der betreffenden Stelle von einer vorherigen Berechnung bereits ein Punkt
-        # vorhanden ist. Falls nicht, wird er in die Ausgabedatei geschrieben.
-        # Die X-Bildkoordinate wird in jedem Fall um einen Schritt erhoeht.
-        else {
-          anzPte++; # Zaehler fuer die Anzahl Azimute pro Berechnung
-          abstY = radPr * tan(gon2rad(hoehenwinkel[j]));
-
-          if (anzBer == 1 && anzPte == 1) {
-            minY = abstY; # minimale Y-Koordinate bei erster Berechnung und erstem Punkt initialisieren
-            maxY = abstY; # maximale Y-Koordinate bei erster Berechnung und erstem Punkt initialisieren
-          } 
-
-          xy = abstX abstY; # X und Y Bildkoordinate als String konkatenieren
-          for (k in bisherigePte)
-            if (xy == bisherigePte[k])
-              existiertPkt = 1;
-          if (existiertPkt == 0) {
-            dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
-            # Bestimmen der Lagekoordinaten jedes Punktes
-            if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
-              abort("\nungueltiges Azimut.");
-            # Bestimmen der Hoehe jedes Punktes
-            xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
-            # Punkt in Panoramadatei schreiben
-            distRel = round((i - minDist) / distRelDiv);
-            printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], xyPt[1] " "  xyPt[2], distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panofile;
-
-            # minimale und maximale Bildkoordinaten aktualisieren
-            if (abstX < minX)
-              minX = abstX;
-            if (abstX > maxX)
-              maxX = abstX;
-            if (abstY < minY)
-              minY = abstY;
-            if (abstY > maxY)
-              maxY = abstY;
-
-            # Falls ein Namensfile definiert wurde, pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen
-            # und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
-            if (namFile != "0") {
-              for (nam = 1; nam <= anzNam; nam++) {
-                # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten oder Namenscode 99 suchen
-                if (((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) || namCode[nam] == 99) {
-                  if (((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) || namCode[nam] == 99) {
-                    nameHoehe = namName[nam] namZ[nam]; # Name und Hoehe als String konkatenieren, zwecks Eindeutigkeit
-                    for (m in bisherigeNamen)
-                      if (nameHoehe == bisherigeNamen[m])
-                        existiertNam = 1;
-                    # Name mit relevanten Informationen in temporaere Textdatei schreiben, sofern nicht bereits vorhanden
-                    # Distanz zu jedem Namenspunkt berechnen
-                    if (existiertNam == 0) {
-                      namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM);
-                      namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
-                      namDist = distanzEbene(x, y, namX[nam], namY[nam]);
-                      printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY) > namTmpFile;
-                      bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
-                    }
-                    else
-                      existiertNam = 0;
-                  }
-                }
-              }
-            }
-          }
-          else
-            existiertPkt = 0;
-          bisherigePte[j] = xy; # aktueller Punkt ins Array eintragen
-          abstX = abstX + (gonInMM * aufloesAziCalc);
-        }
-      }
-
-      # numerische Ausgabe wieder loeschen
-      system("rm -f " resfile);
-    }
-
-    close(panofile);
-    close(namTmpFile);
-
-    ###########################################
-    ###### 3. Teil: Namen-DXF erstellen #######
-    ###########################################
-
-    if (namFile != "0") {
-
-      # Namen-Ergebnisfile der Panoramaberechnung einlesen
-      anzNam = namTmpEinlesen(namTmpFile);
-
-      # Zuschlag rechts und oben, damit Texte innerhalb des Rahmens liegen
-      erwRechts = 60;
-      erwOben = 80;
-
-      # Pruefen, ob Namen nahe des rechten Bildrandes liegen, und falls ja, Rand um erwRechts nach rechts erweitern
-      namRe = 0;
-      for (i = 1; i <= anzNam; i++) {
-        if (namX[i] > namRe)
-          namRe = namX[i];
-      }
-      if ((maxX - namRe) < erwRechts)
-        maxX = maxX + erwRechts;
-
-      # DXF aufbauen
-      dxfHeader(namDXFFile, minX, minY, maxX, maxY + erwOben);
-      dxfInhaltBeginn(namDXFFile);
-
-      dxfLinienInhalt(namDXFFile, minX, 0, 20, 0, "HORIZONT");        # Horizontlinie links
-      dxfLinienInhalt(namDXFFile, maxX - 20, 0, maxX, 0, "HORIZONT"); # Horizontlinie rechts
-
-      dxfLinienInhalt(namDXFFile, minX, minY, minX, maxY + erwOben, "RAHMEN");           # vertikale Linie links
-      dxfLinienInhalt(namDXFFile, maxX, minY, maxX, maxY + erwOben, "RAHMEN");           # vertikale Linie rechts
-      dxfLinienInhalt(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
-      dxfLinienInhalt(namDXFFile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
-
-      dxfText(namDXFFile, minX + 3, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" links
-      dxfText(namDXFFile, maxX - 16, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" rechts
-
-      for (i = 1; i <= anzNam; i++)
-        dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
-      for (i = 1; i <= anzNam; i++)
-        dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
-
-      dxfAbschluss(namDXFFile);
-    }
-
-    ###########################################
-    ########### 4. Teil: Abschluss ############
-    ###########################################
-
-    # Dauer der Berechnung ermitteln und ausgeben
-    berechnungsdauer = convertsecs(systime() - start);
-    printf("\nDauer der Berechnung: %s\n", berechnungsdauer);
-
-    ##### Berechnungsprotokoll erstellen #####
-    protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
-    prot(protokoll, version);
-    close(protokoll);
-
-    ##### aufraeumen und beenden #####
-    system("rm -f dhm.txt");
-    system("rm -f nam.txt");
-    system("rm -f sky.rdh");
-    system("rm -f SKYPLOT.CMD");
-    system("rm -f SKYPLOT.LOG");
-    system("rm -f SKYPLOT.PLT");
-    system("rm -f SKYPLOT.RPT");
-
-    if (namFile != "0") {
-      system("rm -f " namFile);
-      system("rm -f " namTmpFile);
-    }
-
-    # um Awk zu zwingen, das Programm zu beenden, ohne Files zu lesen
-    if (ARGV[14] == "")
-      exit;
-
+    # Berechnung abschliessen
+    abschlBer();
   }
 }
 
 ###########################################
 ########## Funktionsdefinitionen ##########
 ###########################################
+
+########## Hauptfunktionen ##########
+
+##### initVar #####
+# diverse Variablen initialisieren 
+function initVar() {
+
+  # diverse Variablen initialisieren
+  formatExtrTxt = "%7s, %7s, %4s, %-15s\n";
+  formatExtrDat = "%7d, %7d, %4d, %-15s\n";
+  formatSilTxt =  "%7s, %7s, %7s, %7s, %6s, %16s, %8s, %5s, %5s, %6s, %5s\n";
+  formatSilDat =  "%7.3f, %7.3f, %7d, %7d, %6d, %16s, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
+  formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
+  formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
+  formatNamTmp =  "%s, %d, %d, %d, %d\n";
+  anzBer = 0; # Anzahl Berechnungen pro Panoramabild
+  anzPte = 0; # Anzahl Azimute pro Berechnung
+}
+
+##### argEinl #####
+# liest Argumente ein
+function argEinl() {
+
+  # speichern der Argumente in Variablen und nicht erlaubte Fliesskommazahlen auf Ganzzahlen runden
+  x = ARGV[1];
+  y = ARGV[2];
+  z = ARGV[3];
+  name = ARGV[4];
+  dhm = ARGV[5];
+  aufloesAzi = ARGV[6];
+  aziLi = ARGV[7];
+  aziLi = round(aziLi);
+  aziRe = ARGV[8];
+  aziRe = round(aziRe);
+  bildbr = ARGV[9];
+  bildbr = round(bildbr);
+  minDist = ARGV[10] * 1000;
+  minDist = round(minDist);
+  maxDist = ARGV[11] * 1000;
+  maxDist = round(maxDist);
+  aufloesDist = ARGV[12] * 1000;
+  aufloesDist = round(aufloesDist);
+
+  # Namendatenfile kopieren falls gewuenscht
+  namFile = ARGV[13];
+  if (namFile != "0") {
+    namFile = namFile ".txt";
+    namKopieren(namFile);
+    toleranz = ARGV[14];
+    toleranz = round(toleranz);
+  }
+
+  # Array zuruecksetzen, damit Argumente nicht als Files interpretiert werden
+  ARGV[1] = "";
+  ARGV[2] = "";
+  ARGV[3] = "";
+  ARGV[4] = "";
+  ARGV[5] = "";
+  ARGV[6] = "";
+  ARGV[7] = "";
+  ARGV[8] = "";
+  ARGV[9] = "";
+  ARGV[10] = "";
+  ARGV[11] = "";
+  ARGV[12] = "";
+  ARGV[13] = "";
+  ARGV[14] = "";
+}
+
+##### argPr #####
+# prueft Argumente 
+function argPr() {
+
+  # Usage ausgeben, wenn zuviele Argumente
+  if (ARGV[15] != "") {
+    usage();
+    system("rm -f dhm.txt");
+    system("rm -f nam.txt");
+    exit;
+  }
+
+  # Plausibilitaet der Argumente pruefen. Andernfalls Fehlermeldung ausgeben und beenden
+  if (aziLi < -400 || aziLi > 400)
+    abort("\nlinkes Azimut muss zwischen -400 und +400 gon betragen.");
+
+  if (aziRe < -400 || aziRe > 400)
+    abort("\nrechtes Azimut muss zwischen -400 und +400 gon betragen.");
+
+  if (aziLi >= aziRe)
+    abort("\nlinkes Azimut muss kleiner sein als rechtes Azimut.");
+
+  if (minDist < 0)
+    abort("\ndie minimale Distanz kann nicht kleiner als 0 sein.");
+
+  if (minDist >= maxDist)
+    abort("\ndie minimale Distanz muss kleiner als die maximale Distanz sein.");
+}
+
+##### datVorb #####
+# diverse Daten vorbereiten 
+function datVorb() {
+
+  # Hoehenmodell als sky.rdh kopieren
+  dhmKopieren(dhm, "sky.rdh");
+
+  # Oeffnungswinkel bestimmen
+  # 1 gon im Bildkoordinatensystem ermitteln
+  oeffWink = aziRe - aziLi;
+  gonInMM = bildbr / oeffWink;
+
+  # ausgehend von einer Zylinderprojektion wird der Umfang
+  # und der Radius des Projektionszylinders abgeleitet
+  umfang = 400 / oeffWink * bildbr;
+  radPr = umfang / (2 * pi());
+
+  # Extrempunktedatei vorbereiten
+  extrfile = "extr_" name "_" aziLi "-" aziRe ".txt"
+  printf(formatExtrTxt, "X", "Y", "Z", "Extrempunkt") > extrfile;
+
+  # Panoramadatei vorbereiten
+  panofile = "sil_" name "_" aziLi "-" aziRe ".txt"
+  printf(formatSilTxt, "X", "Y", "LageX", "LageY", "LageZ", "LageX LageY", "Dist", "Azi", "HWink", "Limit", "DiRel") > panofile;
+
+  # Namen-Ausgabedateien vorbereiten
+  if (namFile != "0") {
+    namTmpFile = "namTmp.txt"
+    namDXFFile = "nam_" name "_" aziLi "-" aziRe ".dxf"
+    print "\n...Berechnung mit Namen...\n";
+  }
+  else
+    print "\n...Berechnung ohne Namen...\n";
+
+  # aus 'minDist' und 'maxDist' einen Hilfswert ableiten, um spaeter die einzelnen Punkte den
+  # relative Werten 0 bis 10 zuzuweisen (0 = naheliegendst, 10 = entferntest)
+  distRelDiv = (maxDist - minDist) / 10;
+}
+
+##### extrBer #####
+# berechnet die topographischen Extrempunkte, d.h. den noerdlichsten, oestlichsten
+# suedlichsten, westlichsten, hoechsten und entferntesten Punkt
+function extrBer() {
+  # Arrays zur Speicherung der Extrempunkte initialisieren
+  exEntf["Distanz"] = 0;
+  exHoe["z"] = 0;
+  exNord["x"] = exOst["x"] = exSued["x"] = exWest["x"] = x;
+  exNord["y"] = exOst["y"] = exSued["y"] = exWest["y"] = y;
+
+  # Theoretische Aussichtsweite ermitteln
+  maxSicht = theoausweit(z);
+
+  # bei geringer theoretischen Aussichtsweite (niedriges Projektionszentrum) den Wert auf 100 km festlegen 
+  if (maxSicht < 100000)
+    maxSicht = 100000;
+
+  # SCOP LIMITS im Abstand des doppelten zuvor ermittelten Wertes festlegen
+  N = maxDists(x, y, (maxSicht * 2), "N");
+  E = maxDists(x, y, (maxSicht * 2), "E");
+  S = maxDists(x, y, (maxSicht * 2), "S");
+  W = maxDists(x, y, (maxSicht * 2), "W");
+
+  # Erstellen des SCOP-Input-Files SKYPLOT.CMD fuer die Berechnung der Extrempunkte
+  resfile = "extr.txt";
+  skyplot("SKYPLOT.CMD", resfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, "Extrempunkte");
+  
+  # Starten von skyplot und Unterdruecken der Ausgabe
+  print "Berechnung der Extrempunkte...";
+  system("skyplot < SKYPLOT.CMD > /dev/null");
+
+  # Modellhoehe ermitteln
+  mhoehe = modellhoehe(resfile);
+
+  # numerische Ausgabe von Skyplot einlesen
+  maxRec = skyplotEinlesen(resfile);
+
+  # rekonstruieren der azimutalen Aufloesung in gon. Die azimutale Aufloesung kann nicht beliebig klein sein
+  # und haengt vom Oeffnungswinkel ab.
+  # Damit die Darstellung auch dann korrekt erstellt wird, wenn ein zu kleiner Wert eingegeben wird,
+  # muss die tatsaechliche azimutale Aufloesung nachtraeglich aus der numerischen Ausgabe rekonstruiert werden.
+  aufloesAziCalc = oeffWink / (maxRec - 1);
+  
+  # jeden horizontbildenden Punkt auswerten zwecks Bestimmung der Extrempunkte
+  for (i = 1; i <= maxRec; i++ ) {
+  
+    # Entferntester Punkt ermitteln
+    if (distanz[i] > exEntf["Distanz"]) {
+      exEntf["Azi"] = azi[i];
+      exEntf["Distanz"] = distanz[i];
+      exEntf["Hoehenwinkel"] = hoehenwinkel[i];
+    }
+
+    # Hoechster Punkt ermitteln
+    hoehe = hoeheAusDistanzUndWinkel(z, distanz[i], hoehenwinkel[i]);
+    if (hoehe > exHoe["z"]) {
+      exHoe["z"] = hoehe;
+      exHoe["Azi"] = azi[i];
+      exHoe["Distanz"] = distanz[i];
+      exHoe["Hoehenwinkel"] = hoehenwinkel[i];
+    }
+    
+    # Extrempunkte N, E, S, W ermitteln
+    # Distanz in der Ebene (math. Horizont) ermitteln
+    dist0 = ankatheteAusHypotenuseUndWinkel(distanz[i], hoehenwinkel[i]);
+    
+    split(bestimmeXY(x, y, dist0, azi[i]), xyAkt, " ")
+    if (xyAkt[1] == -1)
+      abort("\nungueltiges Azimut.");
+    else
+      extrempunkteNESW(xyAkt[1], xyAkt[2], azi[i], distanz[i], hoehenwinkel[i]);
+
+  }
+
+  # Z Koordinate der Extrempunkte N, E, S, W bestimmen
+  exNord["z"] = hoeheAusDistanzUndWinkel(z, exNord["Distanz"], exNord["Hoehenwinkel"]);
+  exOst["z"] =  hoeheAusDistanzUndWinkel(z, exOst["Distanz"],  exOst["Hoehenwinkel"]);
+  exSued["z"] = hoeheAusDistanzUndWinkel(z, exSued["Distanz"], exSued["Hoehenwinkel"]);
+  exWest["z"] = hoeheAusDistanzUndWinkel(z, exWest["Distanz"], exWest["Hoehenwinkel"]);
+  
+  # X/Y/Z Koordinaten des entferntesten Punktes bestimmen
+  dist0 = ankatheteAusHypotenuseUndWinkel(exEntf["Distanz"], exEntf["Hoehenwinkel"]);
+  if (split(bestimmeXY(x, y, dist0, exEntf["Azi"]), xyEntf, " ") == -1)
+    abort("\nungueltiges Azimut.");
+  exEntf["z"] = hoeheAusDistanzUndWinkel(z, exEntf["Distanz"], exEntf["Hoehenwinkel"]);
+
+  # X/Y Koordinaten des hoechsten Punktes bestimmen
+  dist0 = ankatheteAusHypotenuseUndWinkel(exHoe["Distanz"], exHoe["Hoehenwinkel"]);
+  if (split(bestimmeXY(x, y, dist0, exHoe["Azi"]), xyHoe, " ") == -1)
+    abort("\nungueltiges Azimut.");
+
+  # Extrempunkte in CSV-Datei schreiben
+  printf(formatExtrDat, exNord["x"], exNord["y"], exNord["z"], "Noerdlichster") > extrfile;
+  printf(formatExtrDat, exOst["x"], exOst["y"], exOst["z"], "Oestlichster")     > extrfile;
+  printf(formatExtrDat, exSued["x"], exSued["y"], exSued["z"], "Suedlichster")  > extrfile;
+  printf(formatExtrDat, exWest["x"], exWest["y"], exWest["z"], "Westlichster")  > extrfile;
+  printf(formatExtrDat, xyHoe[1], xyHoe[2], exHoe["z"], "Hoechster")            > extrfile;
+  printf(formatExtrDat, xyEntf[1], xyEntf[2], exEntf["z"], "Entferntester")     > extrfile;
+  close(extrfile);
+
+  # aufraeumen
+  system("rm -f " resfile);
+  system("rm -f SKYPLOT.CMD");
+}
+
+##### panoBer #####
+# berechnet das Panoramabild
+function panoBer() {
+
+  # Variablen zum Speichern der Punkte und Namen einrichten
+  new(bisherigePte);
+  new(bisherigeNamen);
+  existiertPkt = 0;
+  existiertNam = 0;
+
+  # Namendaten einlesen, wenn spezifiziert
+  if (namFile != "0")
+    anzNam = namEinlesen(namFile);
+
+  # um fehlerhafte Resultate zu vermeiden, muss der unmittelbare Nahbereich unterdrueckt werden
+  if (minDist < 500)
+    minDist = 500;
+
+  # Berechnungen im Abstand von 'aufloesDist' durchfuehren, bis 'maxDist' erreicht ist
+  for (i = minDist; i <= maxDist; i += aufloesDist) {
+
+    anzBer++; # Zaehler fuer die Anzahl Berechnungen
+
+    # SCOP LIMITS festlegen
+    N = maxDists(x, y, i, "N");
+    E = maxDists(x, y, i, "E");
+    S = maxDists(x, y, i, "S");
+    W = maxDists(x, y, i, "W");
+
+    # Erstellen des SCOP-Input-Files SKYPLOT.CMD
+    resfile = "sky_" name i ".txt";
+    skyplot("SKYPLOT.CMD", resfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, name);
+
+    # Starten von skyplot und Unterdruecken der Ausgabe
+    printf("Berechnung zu %.1f%% abgeschlossen\n", (i - minDist) * 100 / (maxDist - minDist));
+    system("skyplot < SKYPLOT.CMD > /dev/null");
+
+    # numerische Ausgabe von Skyplot einlesen und Anzahl Datenzeilen speichern
+    maxRec = skyplotEinlesen(resfile);
+
+    # am linken Bildrand beginnen
+    abstX = 0;
+    if (anzBer == 1) {
+      minX = abstX; # minimale X-Koordinate bei erster Berechnung initialisieren
+      maxX = abstX; # maximale X-Koordinate bei erster Berechnung initialisieren
+    }
+
+    # X/Y in Bildkoordinaten fuer jeden Eintrag der Skyplot-Ausgabe berechnen
+    # der horizontale Abstand der Punkte entspricht einem gon im Bildkoordinatensystem...
+    # ...multipliziert mit der azimutalen Aufloesung in gon
+    # der vertikale Abstand der Punkte entspricht der Gegenkathete, wenn der...
+    # ...Projektionszylinderradius als Ankathete und der Hoehenwinkel als Alpha betrachtet wird
+    for (j = 1; j <= maxRec; j++ ) {
+
+      distDHMrand = distGre(i, azi[j]);
+
+      if (distDHMrand == -1)
+        abort("\nungueltiges Azimut.");
+
+      # Distanz zur Begrenzung des Hoehenmodell-Ausschnitts geringfuegig reduzieren
+      distDHMrand = int(distDHMrand) - 200;
+
+      # Ist die Entfernung des Grenzpunktes der Sichtbarkeit gleich oder groesser der Begrenzung des Hoehenmodell-
+      # Ausschnitts, muss dieser Punkt ignoriert werden, da er keine Gelaendekante, sondern nur den Rand des
+      # Hoehenmodell-Ausschnittes repraesentiert.	Die X-Koordinate muss dennoch einen Schritt erhoeht werden.
+      if (distanz[j] >= distDHMrand) {
+        abstX = abstX + (gonInMM * aufloesAziCalc);
+        continue;
+      }
+      # andernfalls wird geprueft, ob an der betreffenden Stelle von einer vorherigen Berechnung bereits ein Punkt
+      # vorhanden ist. Falls nicht, wird er in die Ausgabedatei geschrieben.
+      # Die X-Bildkoordinate wird in jedem Fall um einen Schritt erhoeht.
+      else {
+        anzPte++; # Zaehler fuer die Anzahl Azimute pro Berechnung
+        abstY = radPr * tan(gon2rad(hoehenwinkel[j]));
+
+        if (anzBer == 1 && anzPte == 1) {
+          minY = abstY; # minimale Y-Koordinate bei erster Berechnung und erstem Punkt initialisieren
+          maxY = abstY; # maximale Y-Koordinate bei erster Berechnung und erstem Punkt initialisieren
+        } 
+
+        xy = abstX abstY; # X und Y Bildkoordinate als String konkatenieren
+        for (k in bisherigePte)
+          if (xy == bisherigePte[k])
+            existiertPkt = 1;
+        if (existiertPkt == 0) {
+          dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
+          # Bestimmen der Lagekoordinaten jedes Punktes
+          if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
+            abort("\nungueltiges Azimut.");
+          # Bestimmen der Hoehe jedes Punktes
+          xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
+          # Punkt in Panoramadatei schreiben
+          distRel = round((i - minDist) / distRelDiv);
+          printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], xyPt[1] " "  xyPt[2], distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panofile;
+
+          # minimale und maximale Bildkoordinaten aktualisieren
+          if (abstX < minX)
+            minX = abstX;
+          if (abstX > maxX)
+            maxX = abstX;
+          if (abstY < minY)
+            minY = abstY;
+          if (abstY > maxY)
+            maxY = abstY;
+
+          # Falls ein Namensfile definiert wurde, Namen in perspektivischer Ansicht berechnen
+          if (namFile != "0")
+            panoNamBer();
+        }
+        else
+          existiertPkt = 0;
+        bisherigePte[j] = xy; # aktueller Punkt ins Array eintragen
+        abstX = abstX + (gonInMM * aufloesAziCalc);
+      }
+    }
+
+    # numerische Ausgabe wieder loeschen
+    system("rm -f " resfile);
+  }
+
+  close(panofile);
+  
+}
+
+##### panoNamBer #####
+# berechnet die Namen im Panoramabild
+# pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen...
+# ...und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
+# mit Namenscode 99 gekennzeichnete Namen werden in jedem Fall dargestellt
+function panoNamBer() {
+  for (nam = 1; nam <= anzNam; nam++) {
+    # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten oder Namenscode 99 suchen
+    if (((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) || namCode[nam] == 99) {
+      if (((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) || namCode[nam] == 99) {
+        nameHoehe = namName[nam] namZ[nam]; # Name und Hoehe als String konkatenieren, zwecks Eindeutigkeit
+        for (m in bisherigeNamen)
+          if (nameHoehe == bisherigeNamen[m])
+            existiertNam = 1;
+        # Name mit relevanten Informationen in temporaere Textdatei schreiben, sofern nicht bereits vorhanden
+        # Distanz zu jedem Namenspunkt berechnen
+        if (existiertNam == 0) {
+          namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM);
+          namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
+          namDist = distanzEbene(x, y, namX[nam], namY[nam]);
+          printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY) >> namTmpFile;
+          bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
+        }
+        else
+          existiertNam = 0;
+      }
+    }
+  }
+  close(namTmpFile);
+}
+
+##### dxfBer #####
+# berechnet das DXF-File mit Namen und Zuordnungslinien aus dem Namen-Ergebnisfile der Panoramaberechnung
+function dxfBer() {
+
+  # Namen-Ergebnisfile der Panoramaberechnung einlesen
+  anzNam = namTmpEinlesen(namTmpFile);
+
+  # Zuschlag rechts und oben, damit Texte innerhalb des Rahmens liegen
+  erwRechts = 60;
+  erwOben = 80;
+
+  # Pruefen, ob Namen nahe des rechten Bildrandes liegen, und falls ja, Rand um erwRechts nach rechts erweitern
+  namRe = 0;
+  for (i = 1; i <= anzNam; i++) {
+    if (namX[i] > namRe)
+      namRe = namX[i];
+  }
+  if ((maxX - namRe) < erwRechts)
+    maxX = maxX + erwRechts;
+
+  # DXF aufbauen
+  dxfHeader(namDXFFile, minX, minY, maxX, maxY + erwOben);
+  dxfInhaltBeginn(namDXFFile);
+
+  dxfLinienInhalt(namDXFFile, minX, 0, 20, 0, "HORIZONT");        # Horizontlinie links
+  dxfLinienInhalt(namDXFFile, maxX - 20, 0, maxX, 0, "HORIZONT"); # Horizontlinie rechts
+
+  dxfLinienInhalt(namDXFFile, minX, minY, minX, maxY + erwOben, "RAHMEN");           # vertikale Linie links
+  dxfLinienInhalt(namDXFFile, maxX, minY, maxX, maxY + erwOben, "RAHMEN");           # vertikale Linie rechts
+  dxfLinienInhalt(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
+  dxfLinienInhalt(namDXFFile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
+
+  dxfText(namDXFFile, minX + 3, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" links
+  dxfText(namDXFFile, maxX - 16, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" rechts
+
+  for (i = 1; i <= anzNam; i++)
+    dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
+  for (i = 1; i <= anzNam; i++)
+    dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
+
+  dxfAbschluss(namDXFFile);
+}
+
+##### abschlBer #####
+# schliesst die Berechnung ab und loescht temporaere Dateien
+function abschlBer() {
+
+  # Dauer der Berechnung ermitteln und ausgeben
+  berechnungsdauer = convertsecs(systime() - start);
+  printf("\nDauer der Berechnung: %s\n", berechnungsdauer);
+
+  # Berechnungsprotokoll erstellen
+  protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
+  prot(protokoll, version);
+  close(protokoll);
+
+  # aufraeumen und beenden
+  system("rm -f dhm.txt");
+  system("rm -f nam.txt");
+  system("rm -f sky.rdh");
+  system("rm -f SKYPLOT.CMD");
+  system("rm -f SKYPLOT.LOG");
+  system("rm -f SKYPLOT.PLT");
+  system("rm -f SKYPLOT.RPT");
+
+  if (namFile != "0") {
+    system("rm -f " namFile);
+    system("rm -f " namTmpFile);
+  }
+
+  # um Awk zu zwingen, das Programm zu beenden, ohne Files zu lesen
+  if (ARGV[14] == "")
+    exit;
+}
+
 
 ########## allgemeine Funktionen ##########
 
@@ -1010,11 +1065,11 @@ function namEinlesen(namFile,    i) {
   while ((getline < namFile) > 0) {
     i++;
     namName[i] = substr($0, 1, 32);
-    namX[i] =    substr($0, 37, 8);
+    namX[i] =    substr($0, 35, 10);
     namX[i] =    round(namX[i]);
-    namY[i] =    substr($0, 49, 8);
+    namY[i] =    substr($0, 47, 10);
     namY[i] =    round(namY[i]);
-    namZ[i] =    substr($0, 63, 6);
+    namZ[i] =    substr($0, 61, 8);
     namZ[i] =    round(namZ[i]);
     namCode[i] = substr($0, 71, 2);
   }
