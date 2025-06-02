@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         01.06.2025
-# Version:      2.5
+# Date:         02.06.2025
+# Version:      2.6
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -33,7 +33,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.5";
+  version = "2.6";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -463,8 +463,8 @@ function panoBer() {
 function panoNamBer() {
   for (nam = 1; nam <= anzNam; nam++) {
     # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten oder Namenscode 99 suchen
-    if (((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) || namCode[nam] == 99) {
-      if (((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) || namCode[nam] == 99) {
+    if ((((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) || namCode[nam] == 99) && namCode[nam] != 98) {
+      if ((((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) || namCode[nam] == 99) && namCode[nam] != 98) {
         nameHoehe = namName[nam] namZ[nam]; # Name und Hoehe als String konkatenieren, zwecks Eindeutigkeit
         for (m in bisherigeNamen)
           if (nameHoehe == bisherigeNamen[m])
