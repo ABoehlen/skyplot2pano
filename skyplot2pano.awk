@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         02.06.2025
-# Version:      2.6
+# Date:         07.06.2025
+# Version:      2.7
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -33,7 +33,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.6";
+  version = "2.7";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -102,7 +102,7 @@ function initVar() {
   formatSilDat =  "%7.3f, %7.3f, %7d, %7d, %6d, %16s, %8.1f, %5.1f, %5.1f, %6d, %5d\n";
   formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
   formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
-  formatNamTmp =  "%s, %d, %d, %d, %d\n";
+  formatNamTmp =  "%s, %d, %d, %d, %d, %d\n";
   anzBer = 0; # Anzahl Berechnungen pro Panoramabild
   anzPte = 0; # Anzahl Azimute pro Berechnung
 }
@@ -204,8 +204,8 @@ function datVorb() {
   radPr = umfang / (2 * pi());
 
   # Extrempunktedatei vorbereiten
-  extrfile = "extr_" name "_" aziLi "-" aziRe ".txt"
-  printf(formatExtrTxt, "X", "Y", "Z", "Extrempunkt") > extrfile;
+  extrFile = "extr_" name "_" aziLi "-" aziRe ".txt"
+  printf(formatExtrTxt, "X", "Y", "Z", "Extrempunkt") > extrFile;
 
   # Panoramadatei vorbereiten
   panofile = "sil_" name "_" aziLi "-" aziRe ".txt"
@@ -317,13 +317,13 @@ function extrBer() {
     abort("\nungueltiges Azimut.");
 
   # Extrempunkte in CSV-Datei schreiben
-  printf(formatExtrDat, exNord["x"], exNord["y"], exNord["z"], "Noerdlichster") > extrfile;
-  printf(formatExtrDat, exOst["x"], exOst["y"], exOst["z"], "Oestlichster")     > extrfile;
-  printf(formatExtrDat, exSued["x"], exSued["y"], exSued["z"], "Suedlichster")  > extrfile;
-  printf(formatExtrDat, exWest["x"], exWest["y"], exWest["z"], "Westlichster")  > extrfile;
-  printf(formatExtrDat, xyHoe[1], xyHoe[2], exHoe["z"], "Hoechster")            > extrfile;
-  printf(formatExtrDat, xyEntf[1], xyEntf[2], exEntf["z"], "Entferntester")     > extrfile;
-  close(extrfile);
+  printf(formatExtrDat, exNord["x"], exNord["y"], exNord["z"], "Noerdlichster") > extrFile;
+  printf(formatExtrDat, exOst["x"], exOst["y"], exOst["z"], "Oestlichster")     > extrFile;
+  printf(formatExtrDat, exSued["x"], exSued["y"], exSued["z"], "Suedlichster")  > extrFile;
+  printf(formatExtrDat, exWest["x"], exWest["y"], exWest["z"], "Westlichster")  > extrFile;
+  printf(formatExtrDat, xyHoe[1], xyHoe[2], exHoe["z"], "Hoechster")            > extrFile;
+  printf(formatExtrDat, xyEntf[1], xyEntf[2], exEntf["z"], "Entferntester")     > extrFile;
+  close(extrFile);
 
   # aufraeumen
   system("rm -f " resfile);
@@ -471,12 +471,19 @@ function panoNamBer() {
             existiertNam = 1;
         # Name mit relevanten Informationen in temporaere Textdatei schreiben, sofern nicht bereits vorhanden
         # Distanz zu jedem Namenspunkt berechnen
+        # Pruefen, dass Name innerhalb des definierten Sektors liegt
         if (existiertNam == 0) {
-          namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM);
-          namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
-          namDist = distanzEbene(x, y, namX[nam], namY[nam]);
-          printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY) >> namTmpFile;
-          bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
+          if (azimut(x, y, namX[nam], namY[nam]) > aziLi && azimut(x, y, namX[nam], namY[nam]) < aziRe) {
+            namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM);
+            namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
+            namDist = distanzEbene(x, y, namX[nam], namY[nam]);
+            printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY, namCode[nam]) >> namTmpFile;
+            bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
+
+            # minimale Bildkoordinate aktualisieren
+            if (namAbstY < minY)
+              minY = namAbstY;
+          }
         }
         else
           existiertNam = 0;
@@ -518,13 +525,19 @@ function dxfBer() {
   dxfLinienInhalt(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
   dxfLinienInhalt(namDXFFile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
 
-  dxfText(namDXFFile, minX + 3, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" links
+  dxfText(namDXFFile, minX + 3, 1, 0 , "Horizont", "HORIZONT");  # Text "Horizont" links
   dxfText(namDXFFile, maxX - 16, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" rechts
 
   for (i = 1; i <= anzNam; i++)
-    dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
+    if (namC[i] == 99)
+      dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE_99");
+    else
+      dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
   for (i = 1; i <= anzNam; i++)
-    dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
+    if (namC[i] == 99)
+      dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME_99");
+    else
+      dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
 
   dxfAbschluss(namDXFFile);
 }
@@ -1106,7 +1119,7 @@ function namListeEinlesen(namListe,    i) {
 
 ##### namTmpEinlesen #####
 # einlesen des temporaeren Namensfiles
-# aus den Daten die Arrays 'namName', 'namZ', 'namD' (Entfernung) sowie 'namX' und 'namY' fuer die Bildkoordinaten bilden
+# aus den Daten die Arrays 'namName', 'namZ', 'namD' (Entfernung) sowie 'namX' und 'namY' fuer die Bildkoordinaten und 'namC' fuer den Namenscode bilden
 # Anzahl Datenzeilen zurueckliefern
 function namTmpEinlesen(namTmpFile,    i) {
   new(namName);
@@ -1114,6 +1127,7 @@ function namTmpEinlesen(namTmpFile,    i) {
   new(namD);
   new(namX);
   new(namY);
+  new(namC);
   i = 0;
   while ((getline < namTmpFile) > 0) {
     i++;
@@ -1127,6 +1141,8 @@ function namTmpEinlesen(namTmpFile,    i) {
     namX[i] = namX[i] + 0;
     namY[i] = $5;
     namY[i] = namY[i] + 0;
+    namC[i] = $6;
+	namC[i] = namC[i] + 0;
   }
   close(namTmpFile);
   return i;
