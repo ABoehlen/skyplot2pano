@@ -1,0 +1,306 @@
+/3.2
+(ODB.1
+	FirstRootClassName:	"Legend"
+	Roots:	2
+	Version:	32
+)
+
+(Legend.2
+	SymType:	0x03
+	LegType:	0x08
+	ClassType:	0x03
+	FieldNames:	3
+	Symbols:	4
+	Class:	38
+	Class:	39
+	Class:	40
+	Class:	41
+	StdDevs:	1.00000000000000
+	NullSym:	42
+	NullValues:	51
+	StatValues:	52
+	Precision:	-3
+)
+
+(AVStr.3
+	S:	"Layer"
+)
+
+(SymList.4
+	Child:	5
+	Child:	13
+	Child:	21
+	Child:	29
+)
+
+(TxSym.5
+	Color:	6
+	Font:	7
+	BgColor:	11
+	OlColor:	12
+	Size:	12.00000000000000
+)
+
+(TClr.6
+)
+
+(NFont.7
+	Family:	8
+	Name:	9
+	Style:	10
+	Italic:	1
+	Weight:	1
+	Wideness:	1
+)
+
+(AVStr.8
+	S:	"Segoe UI"
+)
+
+(AVStr.9
+	S:	"Segoe UI Kursiv"
+)
+
+(AVStr.10
+	S:	"Kursiv"
+)
+
+(TClr.11
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TClr.12
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TxSym.13
+	Color:	14
+	Font:	15
+	BgColor:	19
+	OlColor:	20
+	Size:	14.00000000000000
+)
+
+(TClr.14
+)
+
+(NFont.15
+	Family:	16
+	Name:	17
+	Style:	18
+	Weight:	1
+	Wideness:	1
+)
+
+(AVStr.16
+	S:	"Segoe UI Light"
+)
+
+(AVStr.17
+	S:	"Segoe UI Light"
+)
+
+(AVStr.18
+	S:	"Normal"
+)
+
+(TClr.19
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TClr.20
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TxSym.21
+	Color:	22
+	Font:	23
+	BgColor:	27
+	OlColor:	28
+	Size:	12.00000000000000
+)
+
+(TClr.22
+	Red:	0xa5a5
+	Green:	0xa5a5
+	Blue:	0xa5a5
+)
+
+(NFont.23
+	Family:	24
+	Name:	25
+	Style:	26
+	Italic:	1
+	Weight:	1
+	Wideness:	1
+)
+
+(AVStr.24
+	S:	"Segoe UI"
+)
+
+(AVStr.25
+	S:	"Segoe UI Kursiv"
+)
+
+(AVStr.26
+	S:	"Kursiv"
+)
+
+(TClr.27
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TClr.28
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TxSym.29
+	Color:	30
+	Font:	31
+	BgColor:	36
+	OlColor:	37
+	Size:	12.00000000000000
+)
+
+(TClr.30
+	Name:	"Transparent"
+)
+
+(NFont.31
+	Family:	32
+	Name:	33
+	Style:	34
+	CommonFamily:	35
+	Italic:	1
+	Weight:	1
+	Wideness:	1
+)
+
+(AVStr.32
+	S:	"Arial"
+)
+
+(AVStr.33
+	S:	"Arial Kursiv"
+)
+
+(AVStr.34
+	S:	"Kursiv"
+)
+
+(AVStr.35
+	S:	"Helvetica"
+)
+
+(TClr.36
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TClr.37
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(LClass.38
+	IsText:	1
+	Label:	"BERGNAME"
+	MinStr:	"BERGNAME"
+	MaxStr:	"BERGNAME"
+	Precision:	-3
+)
+
+(LClass.39
+	IsText:	1
+	Label:	"HORIZONT"
+	MinStr:	"HORIZONT"
+	MaxStr:	"HORIZONT"
+	Precision:	-3
+)
+
+(LClass.40
+	IsText:	1
+	Label:	"BERGNAME_99"
+	MinStr:	"BERGNAME_99"
+	MaxStr:	"BERGNAME_99"
+	Precision:	-3
+)
+
+(LClass.41
+	IsNoData:	1
+	IsText:	1
+	Label:	"No Data"
+	Precision:	-3
+)
+
+(TxSym.42
+	Color:	43
+	Font:	44
+	BgColor:	49
+	OlColor:	50
+	Size:	12.00000000000000
+)
+
+(TClr.43
+	Name:	"Transparent"
+)
+
+(NFont.44
+	Family:	45
+	Name:	46
+	Style:	47
+	CommonFamily:	48
+	Italic:	1
+	Weight:	1
+	Wideness:	1
+)
+
+(AVStr.45
+	S:	"Arial"
+)
+
+(AVStr.46
+	S:	"Arial Kursiv"
+)
+
+(AVStr.47
+	S:	"Kursiv"
+)
+
+(AVStr.48
+	S:	"Helvetica"
+)
+
+(TClr.49
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(TClr.50
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(NameDict.51
+)
+
+(NameDict.52
+)
+
