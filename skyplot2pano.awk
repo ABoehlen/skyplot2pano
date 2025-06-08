@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         07.06.2025
-# Version:      2.7
+# Date:         08.06.2025
+# Version:      2.7.1
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -23,6 +23,100 @@
 #
 #########################################################################################################################################################
 
+########## globale Variablen und ihre Bedeutung ##########
+
+#abstX           # X-Abstand zum linken Bildrand in mm
+#abstY           # Y-Abstand zum mathematischen Horizont in mm
+#anzBer          # Anzahl Berechnungen pro Panoramabild
+#anzPte          # Anzahl Azimute pro Berechnung
+#anzDhm          # Anzahl eingelesene Hoehenmodelle
+#anzNam          # Anzahl eingelesene Namen
+#anzNamFiles     # Anzahl eingelesene Namendateien
+#aufloesAzi      # Azimutale Aufloesung in gon
+#aufloesDist     # Intervalle der Berechnungen in km
+#azi             # Array fuer das Azimut der Skyplot-Ausgabe in gon
+#aziLi           # Azimut links in gon
+#aziRe           # Azimut rechts in gon
+#berD            # Berechnungsdauer in Sekunden
+#bildbr          # Bildbreite in mm
+#existiertNam    # binaerer Wert, ob Name schon berechnet oder nicht
+#bisherigeNamen  # Array fuer bereits berechnete Namen
+#existiertPkt    # binaerer Wert, ob Silhouettenpunkt schon berechnet oder nicht
+#bisherigePte    # Array fuer bereits berechnete Silhouettenpunkte
+#dhm             # verwendetes Hoehenmodell
+#dhmBeschr       # Array fuer die Beschreibung der verfuegbaren Hoehenmodelle
+#dhmKuerz        # Array fuer die Kuerzel der verfuegbaren Hoehenmodelle
+#dhmPfad         # Array fuer die Ablage der verfuegbaren Hoehenmodelle
+#distanz         # Array fuer die Distanz der Skyplot-Ausgabe in der Einheit des Koordinatensystems
+#dist0           # Distanz in der Ebene in der Einheit des Koordinatensystems
+#distDHMrand     # Distanz zur Begrenzung des Hoehenmodell-Ausschnitts
+#distRel         # relativer Wert der Distanz (0 - 9)
+#distRelDiv      # Hilfswert, um Silhouettenpunkte relativen Werten zuzuordnen
+#E               # oestliche Begrenzung fuer SCOP Skyplot
+#erwOben         # Zuschlag oben, damit Texte innerhalb des Rahmens liegen
+#erwRechts       # Zuschlag rechts, damit Texte innerhalb des Rahmens liegen
+#exEntf          # Array fuer die Daten des entferntesten Extrempunktes
+#exHoe           # Array fuer die Daten des hoechsten Extrempunktes
+#exNord          # Array fuer die Daten des noerdlichen Extrempunktes
+#exOst           # Array fuer die Daten des oestlichen Extrempunktes
+#exSued          # Array fuer die Daten des suedlichen Extrempunktes
+#exWest          # Array fuer die Daten des westlichen Extrempunktes
+#extrFile        # Extrempunkte-Datei
+#formatExtrDat   # Formatierungsstring Extrempunkte Datenzeilen
+#formatExtrTxt   # Formatierungsstring Extrempunkte Titel
+#formatProtDat   # Formatierungsstring Protokoll Datenzeilen
+#formatProtTxt   # Formatierungsstring Protokoll Titel
+#formatSilDat    # Formatierungsstring Silhouetten Datenzeilen
+#formatSilTxt    # Formatierungsstring Silhouetten Titel
+#gonInMM         # mm, die ein gon im Bildkoordinatensystem entspricht
+#hoehenwinkel    # Array fuer den Hoehenwinkel der Skyplot-Ausgabe in gon
+#maxDist         # maximale Distanz in km
+#maxRec          # Anzahl Datenzeilen in Skyplot-Ausgabe
+#maxX            # maximale X-Bildkoordinate in mm
+#maxY            # maximale Y-Bildkoordinate in mm
+#minDist         # minimale Distanz in km
+#minX            # minimale X-Bildkoordinate in mm
+#minY            # minimale Y-Bildkoordinate in mm
+#N               # noerdliche Begrenzung fuer SCOP Skyplot
+#namAbstX        # X-Koordinate des Namenpunktes in mm
+#namAbstY        # Y-Koordinate des Namenpunktes in mm
+#namBeschr       # Array fuer die Beschreibung der verfuegbaren Namendateien
+#namtC           # Array fuer die Namen-Prioritaeten der eingelesenen temporaeren Namendatei
+#namCode         # Array fuer die Namen-Prioritaeten der eingelesenen Namendatei
+#namtD           # Array fuer die Namen-Entfernungen der eingelesenen temporaeren Namendatei
+#namDist         # Distanz des betreffenden Namens in der Einheit des Koordinatensystems
+#namKuerz        # Array fuer die Kuerzel der verfuegbaren Namendateien
+#namName         # Array fuer die Namen der eingelesenen Namendatei
+#namtName        # Array fuer die Namen der eingelesenen temporaeren Namendatei
+#namPfad         # Array fuer die Ablage der verfuegbaren Namendateien
+#namRe           # Rechtester X-Wert eines Namens im Bildkoordinatensystem 
+#namX            # Array fuer die Namen-X-Koordinaten der eingelesenen Namendatei
+#namtX           # Array fuer die Namen-X-Koordinaten der eingelesenen temporaeren Namendatei
+#namY            # Array fuer die Namen-Y-Koordinaten der eingelesenen Namendatei
+#namtY           # Array fuer die Namen-Y-Koordinaten der eingelesenen temporaeren Namendatei
+#namZ            # Array fuer die Namen-Z-Koordinaten der eingelesenen Namendatei
+#namtZ           # Array fuer die Namen-Z-Koordinaten der eingelesenen temporaeren Namendatei
+#name            # Name Projektionszentrum
+#nameHoehe       # Name und Hoehe als String konkateniert
+#namDXFFile      # DXF-Datei mit Namen, Linien, Horizont und Rahmen
+#namFile         # Namendatei
+#namTmpFile      # temporaere Datei mit den darzustellenden Namen
+#oeffWink        # Oeffnungswinkel in gon
+#panofile        # Panorama (Silhouetten)-Datei
+#protokoll       # Protokoll-Datei
+#radPr           # Radius des Projektionszylinders in mm
+#resfile         # Input-File fuer SCOP Skyplot
+#S               # suedliche Begrenzung fuer SCOP Skyplot
+#start           # Zeitstempel Beginn
+#toleranz        # Lagetoleranz bei Namen in der Einheit des Koordinatensystems
+#umfang          # Umfang (400 gon) in mm
+#version         # Applikation Version
+#W               # westliche Begrenzung fuer SCOP Skyplot
+#x               # X-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
+#xy              # X und Y Bildkoordinate als String konkateniert
+#y               # Y-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
+#z               # Z-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
+
 ##########################
 ########## main ##########
 ##########################
@@ -33,7 +127,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.7";
+  version = "2.7.1";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -507,8 +601,8 @@ function dxfBer() {
   # Pruefen, ob Namen nahe des rechten Bildrandes liegen, und falls ja, Rand um erwRechts nach rechts erweitern
   namRe = 0;
   for (i = 1; i <= anzNam; i++) {
-    if (namX[i] > namRe)
-      namRe = namX[i];
+    if (namtX[i] > namRe)
+      namRe = namtX[i];
   }
   if ((maxX - namRe) < erwRechts)
     maxX = maxX + erwRechts;
@@ -529,15 +623,15 @@ function dxfBer() {
   dxfText(namDXFFile, maxX - 16, 1, 0 , "Horizont", "HORIZONT"); # Text "Horizont" rechts
 
   for (i = 1; i <= anzNam; i++)
-    if (namC[i] == 99)
-      dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE_99");
+    if (namtC[i] == 99)
+      dxfLinienInhalt(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, "ZUORDNUNGSLINIE_99");
     else
-      dxfLinienInhalt(namDXFFile, namX[i], namY[i] + 0.5, namX[i], maxY + 10, "ZUORDNUNGSLINIE");
+      dxfLinienInhalt(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, "ZUORDNUNGSLINIE");
   for (i = 1; i <= anzNam; i++)
-    if (namC[i] == 99)
-      dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME_99");
+    if (namtC[i] == 99)
+      dxfText(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), "BERGNAME_99");
     else
-      dxfText(namDXFFile, namX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namName[i], namZ[i], namD[i]/1000), "BERGNAME");
+      dxfText(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), "BERGNAME");
 
   dxfAbschluss(namDXFFile);
 }
@@ -547,8 +641,8 @@ function dxfBer() {
 function abschlBer() {
 
   # Dauer der Berechnung ermitteln und ausgeben
-  berechnungsdauer = convertsecs(systime() - start);
-  printf("\nDauer der Berechnung: %s\n", berechnungsdauer);
+  berD = convertsecs(systime() - start);
+  printf("\nDauer der Berechnung: %s\n", berD);
 
   # Berechnungsprotokoll erstellen
   protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
@@ -1119,30 +1213,30 @@ function namListeEinlesen(namListe,    i) {
 
 ##### namTmpEinlesen #####
 # einlesen des temporaeren Namensfiles
-# aus den Daten die Arrays 'namName', 'namZ', 'namD' (Entfernung) sowie 'namX' und 'namY' fuer die Bildkoordinaten und 'namC' fuer den Namenscode bilden
+# aus den Daten die Arrays 'namtName', 'namtZ', 'namtD' (Entfernung) sowie 'namtX' und 'namtY' fuer die Bildkoordinaten und 'namtC' fuer den Namenscode bilden
 # Anzahl Datenzeilen zurueckliefern
 function namTmpEinlesen(namTmpFile,    i) {
-  new(namName);
-  new(namZ);
-  new(namD);
-  new(namX);
-  new(namY);
-  new(namC);
+  new(namtName);
+  new(namtZ);
+  new(namtD);
+  new(namtX);
+  new(namtY);
+  new(namtC);
   i = 0;
   while ((getline < namTmpFile) > 0) {
     i++;
     gsub(/[ ]+$/,"",$1) # Leerzeichen am Ende entfernen
-    namName[i] = $1;
-    namZ[i] = $2;
-    namZ[i] = namZ[i] + 0;
-    namD[i] = $3;
-    namD[i] = namD[i] + 0;
-    namX[i] = $4;
-    namX[i] = namX[i] + 0;
-    namY[i] = $5;
-    namY[i] = namY[i] + 0;
-    namC[i] = $6;
-	namC[i] = namC[i] + 0;
+    namtName[i] = $1;
+    namtZ[i] = $2;
+    namtZ[i] = namtZ[i] + 0;
+    namtD[i] = $3;
+    namtD[i] = namtD[i] + 0;
+    namtX[i] = $4;
+    namtX[i] = namtX[i] + 0;
+    namtY[i] = $5;
+    namtY[i] = namtY[i] + 0;
+    namtC[i] = $6;
+	namtC[i] = namtC[i] + 0;
   }
   close(namTmpFile);
   return i;
@@ -1204,7 +1298,7 @@ function prot(protFile, vers) {
   printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                              > protFile;
   printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)                    > protFile;
   printf("Anzahl Berechnungen                 :  %d\n", anzBer)                                  > protFile;
-  printf("Berechnungsdauer                    :  %s\n", berechnungsdauer)                        > protFile;
+  printf("Berechnungsdauer                    :  %s\n", berD)                                    > protFile;
   printf("\n\n\nTopographische Extrempunkte\n")                                                  > protFile;
   printf("%s\n\n", rep(27, "*"))                                                                 > protFile;
   printf("Extrempunkt    " formatProtTxt,\
