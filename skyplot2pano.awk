@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         08.06.2025
-# Version:      2.7.1
+# Date:         28.07.2025
+# Version:      2.9
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -25,36 +25,25 @@
 
 ########## globale Variablen und ihre Bedeutung ##########
 
-#abstX           # X-Abstand zum linken Bildrand in mm
-#abstY           # Y-Abstand zum mathematischen Horizont in mm
 #anzBer          # Anzahl Berechnungen pro Panoramabild
 #anzPte          # Anzahl Azimute pro Berechnung
 #anzDhm          # Anzahl eingelesene Hoehenmodelle
-#anzNam          # Anzahl eingelesene Namen
 #anzNamFiles     # Anzahl eingelesene Namendateien
-#aufloesAzi      # Azimutale Aufloesung in gon
+#aufloesAzi      # eingegebene Azimutale Aufloesung in gon
+#aufloesAziCalc  # rekonstuierte Azimutale Aufloesung in gon
 #aufloesDist     # Intervalle der Berechnungen in km
 #azi             # Array fuer das Azimut der Skyplot-Ausgabe in gon
 #aziLi           # Azimut links in gon
 #aziRe           # Azimut rechts in gon
-#berD            # Berechnungsdauer in Sekunden
 #bildbr          # Bildbreite in mm
-#existiertNam    # binaerer Wert, ob Name schon berechnet oder nicht
 #bisherigeNamen  # Array fuer bereits berechnete Namen
-#existiertPkt    # binaerer Wert, ob Silhouettenpunkt schon berechnet oder nicht
 #bisherigePte    # Array fuer bereits berechnete Silhouettenpunkte
 #dhm             # verwendetes Hoehenmodell
 #dhmBeschr       # Array fuer die Beschreibung der verfuegbaren Hoehenmodelle
 #dhmKuerz        # Array fuer die Kuerzel der verfuegbaren Hoehenmodelle
 #dhmPfad         # Array fuer die Ablage der verfuegbaren Hoehenmodelle
 #distanz         # Array fuer die Distanz der Skyplot-Ausgabe in der Einheit des Koordinatensystems
-#dist0           # Distanz in der Ebene in der Einheit des Koordinatensystems
-#distDHMrand     # Distanz zur Begrenzung des Hoehenmodell-Ausschnitts
-#distRel         # relativer Wert der Distanz (0 - 9)
 #distRelDiv      # Hilfswert, um Silhouettenpunkte relativen Werten zuzuordnen
-#E               # oestliche Begrenzung fuer SCOP Skyplot
-#erwOben         # Zuschlag oben, damit Texte innerhalb des Rahmens liegen
-#erwRechts       # Zuschlag rechts, damit Texte innerhalb des Rahmens liegen
 #exEntf          # Array fuer die Daten des entferntesten Extrempunktes
 #exHoe           # Array fuer die Daten des hoechsten Extrempunktes
 #exNord          # Array fuer die Daten des noerdlichen Extrempunktes
@@ -71,25 +60,19 @@
 #gonInMM         # mm, die ein gon im Bildkoordinatensystem entspricht
 #hoehenwinkel    # Array fuer den Hoehenwinkel der Skyplot-Ausgabe in gon
 #maxDist         # maximale Distanz in km
-#maxRec          # Anzahl Datenzeilen in Skyplot-Ausgabe
 #maxX            # maximale X-Bildkoordinate in mm
 #maxY            # maximale Y-Bildkoordinate in mm
 #minDist         # minimale Distanz in km
 #minX            # minimale X-Bildkoordinate in mm
 #minY            # minimale Y-Bildkoordinate in mm
-#N               # noerdliche Begrenzung fuer SCOP Skyplot
-#namAbstX        # X-Koordinate des Namenpunktes in mm
-#namAbstY        # Y-Koordinate des Namenpunktes in mm
 #namBeschr       # Array fuer die Beschreibung der verfuegbaren Namendateien
 #namtC           # Array fuer die Namen-Prioritaeten der eingelesenen temporaeren Namendatei
 #namCode         # Array fuer die Namen-Prioritaeten der eingelesenen Namendatei
 #namtD           # Array fuer die Namen-Entfernungen der eingelesenen temporaeren Namendatei
-#namDist         # Distanz des betreffenden Namens in der Einheit des Koordinatensystems
 #namKuerz        # Array fuer die Kuerzel der verfuegbaren Namendateien
 #namName         # Array fuer die Namen der eingelesenen Namendatei
 #namtName        # Array fuer die Namen der eingelesenen temporaeren Namendatei
 #namPfad         # Array fuer die Ablage der verfuegbaren Namendateien
-#namRe           # Rechtester X-Wert eines Namens im Bildkoordinatensystem 
 #namX            # Array fuer die Namen-X-Koordinaten der eingelesenen Namendatei
 #namtX           # Array fuer die Namen-X-Koordinaten der eingelesenen temporaeren Namendatei
 #namY            # Array fuer die Namen-Y-Koordinaten der eingelesenen Namendatei
@@ -97,23 +80,18 @@
 #namZ            # Array fuer die Namen-Z-Koordinaten der eingelesenen Namendatei
 #namtZ           # Array fuer die Namen-Z-Koordinaten der eingelesenen temporaeren Namendatei
 #name            # Name Projektionszentrum
-#nameHoehe       # Name und Hoehe als String konkateniert
 #namDXFFile      # DXF-Datei mit Namen, Linien, Horizont und Rahmen
 #namFile         # Namendatei
 #namTmpFile      # temporaere Datei mit den darzustellenden Namen
 #oeffWink        # Oeffnungswinkel in gon
 #panofile        # Panorama (Silhouetten)-Datei
-#protokoll       # Protokoll-Datei
 #radPr           # Radius des Projektionszylinders in mm
 #resfile         # Input-File fuer SCOP Skyplot
-#S               # suedliche Begrenzung fuer SCOP Skyplot
 #start           # Zeitstempel Beginn
 #toleranz        # Lagetoleranz bei Namen in der Einheit des Koordinatensystems
 #umfang          # Umfang (400 gon) in mm
 #version         # Applikation Version
-#W               # westliche Begrenzung fuer SCOP Skyplot
 #x               # X-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
-#xy              # X und Y Bildkoordinate als String konkateniert
 #y               # Y-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
 #z               # Z-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
 
@@ -127,7 +105,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.7.1";
+  version = "2.9";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -176,6 +154,7 @@ BEGIN {
 
     # Berechnung abschliessen
     abschlBer();
+    
   }
 }
 
@@ -322,7 +301,7 @@ function datVorb() {
 ##### extrBer #####
 # berechnet die topographischen Extrempunkte, d.h. den noerdlichsten, oestlichsten
 # suedlichsten, westlichsten, hoechsten und entferntesten Punkt
-function extrBer() {
+function extrBer(    dist0, i, maxRec, maxSicht, N, E, S, W) {
   # Arrays zur Speicherung der Extrempunkte initialisieren
   exEntf["Distanz"] = 0;
   exHoe["z"] = 0;
@@ -383,13 +362,12 @@ function extrBer() {
     
     # Extrempunkte N, E, S, W ermitteln
     # Distanz in der Ebene (math. Horizont) ermitteln
-    dist0 = ankatheteAusHypotenuseUndWinkel(distanz[i], hoehenwinkel[i]);
+    dist0 = ankathAusHypothUndAlpha(distanz[i], hoehenwinkel[i]);
     
-    split(bestimmeXY(x, y, dist0, azi[i]), xyAkt, " ")
-    if (xyAkt[1] == -1)
+    if (bestimmeXY(x, y, dist0, azi[i]) == -1)
       abort("\nungueltiges Azimut.");
     else
-      extrempunkteNESW(xyAkt[1], xyAkt[2], azi[i], distanz[i], hoehenwinkel[i]);
+      extrempunkteNESW(substr(bestimmeXY(x, y, dist0, azi[i]), 0, 10), substr(bestimmeXY(x, y, dist0, azi[i]), 11, 10), azi[i], distanz[i], hoehenwinkel[i]);
 
   }
 
@@ -400,23 +378,27 @@ function extrBer() {
   exWest["z"] = hoeheAusDistanzUndWinkel(z, exWest["Distanz"], exWest["Hoehenwinkel"]);
   
   # X/Y/Z Koordinaten des entferntesten Punktes bestimmen
-  dist0 = ankatheteAusHypotenuseUndWinkel(exEntf["Distanz"], exEntf["Hoehenwinkel"]);
-  if (split(bestimmeXY(x, y, dist0, exEntf["Azi"]), xyEntf, " ") == -1)
+  dist0 = ankathAusHypothUndAlpha(exEntf["Distanz"], exEntf["Hoehenwinkel"]);
+  if (bestimmeXY(x, y, dist0, exEntf["Azi"]) == -1)
     abort("\nungueltiges Azimut.");
+  exEntf["x"] = substr(bestimmeXY(x, y, dist0, exEntf["Azi"]), 0, 10);
+  exEntf["y"] = substr(bestimmeXY(x, y, dist0, exEntf["Azi"]), 11, 10);
   exEntf["z"] = hoeheAusDistanzUndWinkel(z, exEntf["Distanz"], exEntf["Hoehenwinkel"]);
 
   # X/Y Koordinaten des hoechsten Punktes bestimmen
-  dist0 = ankatheteAusHypotenuseUndWinkel(exHoe["Distanz"], exHoe["Hoehenwinkel"]);
-  if (split(bestimmeXY(x, y, dist0, exHoe["Azi"]), xyHoe, " ") == -1)
+  dist0 = ankathAusHypothUndAlpha(exHoe["Distanz"], exHoe["Hoehenwinkel"]);
+  if (bestimmeXY(x, y, dist0, exHoe["Azi"]) == -1)
     abort("\nungueltiges Azimut.");
+  exHoe["x"] = substr(bestimmeXY(x, y, dist0, exHoe["Azi"]), 0, 10);
+  exHoe["y"] = substr(bestimmeXY(x, y, dist0, exHoe["Azi"]), 11, 10);
 
   # Extrempunkte in CSV-Datei schreiben
   printf(formatExtrDat, exNord["x"], exNord["y"], exNord["z"], "Noerdlichster") > extrFile;
   printf(formatExtrDat, exOst["x"], exOst["y"], exOst["z"], "Oestlichster")     > extrFile;
   printf(formatExtrDat, exSued["x"], exSued["y"], exSued["z"], "Suedlichster")  > extrFile;
   printf(formatExtrDat, exWest["x"], exWest["y"], exWest["z"], "Westlichster")  > extrFile;
-  printf(formatExtrDat, xyHoe[1], xyHoe[2], exHoe["z"], "Hoechster")            > extrFile;
-  printf(formatExtrDat, xyEntf[1], xyEntf[2], exEntf["z"], "Entferntester")     > extrFile;
+  printf(formatExtrDat, exHoe["x"] , exHoe["y"] , exHoe["z"], "Hoechster")      > extrFile;
+  printf(formatExtrDat, exEntf["x"], exEntf["y"], exEntf["z"], "Entferntester") > extrFile;
   close(extrFile);
 
   # aufraeumen
@@ -426,17 +408,12 @@ function extrBer() {
 
 ##### panoBer #####
 # berechnet das Panoramabild
-function panoBer() {
+function panoBer(    abstX, abstY, dist0, distDHMrand, distRel, existiertPkt, i, maxRec, xy, N, E, S, W) {
 
   # Variablen zum Speichern der Punkte und Namen einrichten
   new(bisherigePte);
   new(bisherigeNamen);
   existiertPkt = 0;
-  existiertNam = 0;
-
-  # Namendaten einlesen, wenn spezifiziert
-  if (namFile != "0")
-    anzNam = namEinlesen(namFile);
 
   # um fehlerhafte Resultate zu vermeiden, muss der unmittelbare Nahbereich unterdrueckt werden
   if (minDist < 500)
@@ -458,7 +435,7 @@ function panoBer() {
     skyplot("SKYPLOT.CMD", resfile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, name);
 
     # Starten von skyplot und Unterdruecken der Ausgabe
-    printf("Berechnung zu %.1f%% abgeschlossen\n", (i - minDist) * 100 / (maxDist - minDist));
+    printf("Berechnung zu %.1f%% abgeschlossen\t%s Sek.\n", (i - minDist) * 100 / (maxDist - minDist), (systime() - start));
     system("skyplot < SKYPLOT.CMD > /dev/null");
 
     # numerische Ausgabe von Skyplot einlesen und Anzahl Datenzeilen speichern
@@ -510,15 +487,18 @@ function panoBer() {
           if (xy == bisherigePte[k])
             existiertPkt = 1;
         if (existiertPkt == 0) {
-          dist0 = ankatheteAusHypotenuseUndWinkel(distanz[j], hoehenwinkel[j])
+          dist0 = ankathAusHypothUndAlpha(distanz[j], hoehenwinkel[j])
           # Bestimmen der Lagekoordinaten jedes Punktes
-          if (split(bestimmeXY(x, y, dist0, azi[j]), xyPt, " ") == -1)
+          if (bestimmeXY(x, y, dist0, azi[j]) == -1)
             abort("\nungueltiges Azimut.");
+          xyPt["x"] = substr(bestimmeXY(x, y, dist0, azi[j]), 0, 10);
+          xyPt["y"] = substr(bestimmeXY(x, y, dist0, azi[j]), 11, 10);
+            
           # Bestimmen der Hoehe jedes Punktes
           xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
           # Punkt in Panoramadatei schreiben
           distRel = round((i - minDist) / distRelDiv);
-          printf(formatSilDat, abstX, abstY, xyPt[1], xyPt[2], xyPt["z"], xyPt[1] " "  xyPt[2], distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panofile;
+          printf(formatSilDat, abstX, abstY, xyPt["x"], xyPt["y"], xyPt["z"], xyPt["x"] " "  xyPt["y"], distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panofile;
 
           # minimale und maximale Bildkoordinaten aktualisieren
           if (abstX < minX)
@@ -546,7 +526,6 @@ function panoBer() {
   }
 
   close(panofile);
-  
 }
 
 ##### panoNamBer #####
@@ -554,11 +533,17 @@ function panoBer() {
 # pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen...
 # ...und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
 # mit Namenscode 99 gekennzeichnete Namen werden in jedem Fall dargestellt
-function panoNamBer() {
+function panoNamBer(    anzNam, existiertNam, m, nam, namAbstX, namAbstY, namDist, nameHoehe) {
+  existiertNam = 0;
+
+  # Namendaten einlesen, wenn spezifiziert
+  if (namFile != "0")
+    anzNam = namEinlesen(namFile);
+
   for (nam = 1; nam <= anzNam; nam++) {
     # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten oder Namenscode 99 suchen
-    if ((((xyPt[1] - namX[nam]) >= (toleranz * -1) && (xyPt[1] - namX[nam]) <= toleranz) || namCode[nam] == 99) && namCode[nam] != 98) {
-      if ((((xyPt[2] - namY[nam]) >= (toleranz * -1) && (xyPt[2] - namY[nam]) <= toleranz) || namCode[nam] == 99) && namCode[nam] != 98) {
+    if ((((xyPt["x"] - namX[nam]) >= (toleranz * -1) && (xyPt["x"] - namX[nam]) <= toleranz) || namCode[nam] == 99) && namCode[nam] != 98) {
+      if ((((xyPt["y"] - namY[nam]) >= (toleranz * -1) && (xyPt["y"] - namY[nam]) <= toleranz) || namCode[nam] == 99) && namCode[nam] != 98) {
         nameHoehe = namName[nam] namZ[nam]; # Name und Hoehe als String konkatenieren, zwecks Eindeutigkeit
         for (m in bisherigeNamen)
           if (nameHoehe == bisherigeNamen[m])
@@ -589,7 +574,7 @@ function panoNamBer() {
 
 ##### dxfBer #####
 # berechnet das DXF-File mit Namen und Zuordnungslinien aus dem Namen-Ergebnisfile der Panoramaberechnung
-function dxfBer() {
+function dxfBer(    anzNam, erwOben, erwRechts, i, namRe) {
 
   # Namen-Ergebnisfile der Panoramaberechnung einlesen
   anzNam = namTmpEinlesen(namTmpFile);
@@ -638,15 +623,18 @@ function dxfBer() {
 
 ##### abschlBer #####
 # schliesst die Berechnung ab und loescht temporaere Dateien
-function abschlBer() {
+function abschlBer(    berD, protokoll) {
 
   # Dauer der Berechnung ermitteln und ausgeben
   berD = convertsecs(systime() - start);
-  printf("\nDauer der Berechnung: %s\n", berD);
+  
+  printf("\n%s\n", rep(45, "*"))
+  printf("Dauer der Berechnung: %s\n", berD);
+  printf("%s\n", rep(45, "*"))
 
   # Berechnungsprotokoll erstellen
   protokoll = "prot_" name "_" aziLi "-" aziRe ".txt";
-  prot(protokoll, version);
+  prot(protokoll, version, berD);
   close(protokoll);
 
   # aufraeumen und beenden
@@ -685,7 +673,7 @@ function convertsecs(sec,    h, m, s) {
   h = sec / 3600;
   m = (sec % 3600) / 60;
   s = sec % 60;
-  return sprintf("%02d Std. %02d Min. %02d Sek.\n", h, m, s);
+  return sprintf("%02d Std. %02d Min. %02d Sek.", h, m, s);
 }
 
 ##### copy #####
@@ -903,70 +891,70 @@ function azimut(xA, yA, xB, yB,    azi) {
 # bei einem ungueltigen Azimut (< 0 oder > 400) wird -1 zurueckgegeben
 function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
   if (aziGon == 0)
-    return x " " y + dist;
+    return sprintf("%10d%10d", x, y + dist);
   else if (aziGon > 0 && aziGon < 50) {
-    a = gegenkatheteAusHypotenuseUndWinkel(dist, aziGon);
+    a = gegenkathAusHypothUndAlpha(dist, aziGon);
     xE = x + a;
-    yE = y + ankatheteAusGegenkatheteUndWinkel(a, aziGon);
-    return xE " " yE;
+    yE = y + ankathAusGegenkathUndAlpha(a, aziGon);
+    return sprintf("%10d%10d", round(xE), round(yE));
   }
   else if (aziGon >= 50 && aziGon < 100) {
     beta = 100 - aziGon;
-    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
-    xE = x + ankatheteAusGegenkatheteUndWinkel(b, beta);
+    b = gegenkathAusHypothUndAlpha(dist, beta);
+    xE = x + ankathAusGegenkathUndAlpha(b, beta);
     yE = y + b;
-    return xE " " yE;
+    return sprintf("%10d%10d", round(xE), round(yE));
   }
   else if (aziGon == 100)
-    return x + dist " " y;
+    return sprintf("%10d%10d", x + dist, y);
   else if (aziGon > 100 && aziGon < 150) {
     alpha = aziGon - 100;
-    a = gegenkatheteAusHypotenuseUndWinkel(dist, alpha);
-    xE = x + ankatheteAusGegenkatheteUndWinkel(a, alpha);
+    a = gegenkathAusHypothUndAlpha(dist, alpha);
+    xE = x + ankathAusGegenkathUndAlpha(a, alpha);
     yE = y - a;
-    return xE " " yE;
+    return sprintf("%10d%10d", round(xE), round(yE));
    }
   else if (aziGon >= 150 && aziGon < 200) {
     beta = 200 - aziGon;
-    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
+    b = gegenkathAusHypothUndAlpha(dist, beta);
     xE = x + b;
-    yE = y - ankatheteAusGegenkatheteUndWinkel(b, beta);
-    return xE " " yE;
+    yE = y - ankathAusGegenkathUndAlpha(b, beta);
+    return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon == 200)
-    return x " " y - dist;
+    return sprintf("%10d%10d", x, y - dist);
   else if (aziGon > 200 && aziGon < 250) {
     alpha = aziGon - 200;
-    a = gegenkatheteAusHypotenuseUndWinkel(dist, alpha);
+    a = gegenkathAusHypothUndAlpha(dist, alpha);
     xE = x - a;
-    yE = y - ankatheteAusGegenkatheteUndWinkel(a, alpha);
-    return xE " " yE;
+    yE = y - ankathAusGegenkathUndAlpha(a, alpha);
+    return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon >= 250 && aziGon < 300) {
     beta = 300 - aziGon;
-    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
-    xE = x - ankatheteAusGegenkatheteUndWinkel(b, beta);
+    b = gegenkathAusHypothUndAlpha(dist, beta);
+    xE = x - ankathAusGegenkathUndAlpha(b, beta);
     yE = y - b;
-    return xE " " yE;
+    return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon == 300)
-    return x - dist " " y;
+    return sprintf("%10d%10d", x - dist, y);
   else if (aziGon > 300 && aziGon < 350) {
     alpha = aziGon - 300;
-    a = gegenkatheteAusHypotenuseUndWinkel(dist, alpha);
-    xE = x - ankatheteAusGegenkatheteUndWinkel(a, alpha);
+    a = gegenkathAusHypothUndAlpha(dist, alpha);
+    xE = x - ankathAusGegenkathUndAlpha(a, alpha);
     yE = y + a;
-    return xE " " yE;
+    return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon >= 350 && aziGon < 400) {
     beta = 400 - aziGon;
-    b = gegenkatheteAusHypotenuseUndWinkel(dist, beta);
+    b = gegenkathAusHypothUndAlpha(dist, beta);
     xE = x - b;
-    yE = y + ankatheteAusGegenkatheteUndWinkel(b, beta);
-    return xE " " yE;
+    yE = y + ankathAusGegenkathUndAlpha(b, beta);
+    return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else
-    return dist = -1;
+    return -1;
 }
 
 ##### bildkooX #####
@@ -1045,25 +1033,25 @@ function distanzEbene(xA, yA, xB, yB) {
 # die Ankathete entspricht der Haelfte der Mittelsenkrechten, das Azimut dem Winkel Alpha, jeweils
 # umgerechnet auf einen Wert zwischen 0 und 50 gon
 # bei einem ungueltigen Azimut (< 0 oder > 400) wird -1 zurueckgegeben
-function distGre(haelfteMittelsenkr, aziGon,    dist) {
+function distGre(haelfteMittelsenkr, aziGon) {
   if (aziGon >=0 && aziGon < 50)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, aziGon);
   else if (aziGon >= 50 && aziGon < 100)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 100 - aziGon);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, 100 - aziGon);
   else if (aziGon >= 100 && aziGon < 150)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon - 100);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, aziGon - 100);
   else if (aziGon >= 150 && aziGon < 200)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 200 - aziGon);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, 200 - aziGon);
   else if (aziGon >= 200 && aziGon < 250)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon - 200);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, aziGon - 200);
   else if (aziGon >= 250 && aziGon < 300)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 300 - aziGon);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, 300 - aziGon);
   else if (aziGon >= 300 && aziGon < 350)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, aziGon - 300);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, aziGon - 300);
   else if (aziGon >= 350 && aziGon < 400)
-    return dist = hypotenuseAusAnkatheteUndWinkel(haelfteMittelsenkr, 400 - aziGon);
+    return hypothAusAnkathUndAlpha(haelfteMittelsenkr, 400 - aziGon);
   else
-    return dist = -1;
+    return -1;
 }
 
 ##### ekrref #####
@@ -1114,7 +1102,7 @@ function extrempunkteNESW(xAkt, yAkt, azi, dist, hWink) {
 ##### hoeheAusDistanzUndWinkel #####
 # berechnet die Hoehe eines Punktes, der durch Distanz und Hoehenwinkel von einer bekannten Hoehe definiert ist
 function hoeheAusDistanzUndWinkel(z, dist, hWink,    h) {
-  h = gegenkatheteAusHypotenuseUndWinkel(dist, hWink);
+  h = gegenkathAusHypothUndAlpha(dist, hWink);
   h = h + ekrref(dist);
   return h = h + z;
 }
@@ -1268,7 +1256,7 @@ function printTitel(vers, dat,    tit) {
 
 ##### prot #####
 # erzeugt Berechnungsprotokoll
-function prot(protFile, vers) {
+function prot(protFile, vers, berD) {
   printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))                 > protFile;
   printf("Berechnet von: %s\n\n\n", username())                                                  > protFile;
   printf("%s\n", rep(90, "*"))                                                                   > protFile;
@@ -1314,9 +1302,9 @@ function prot(protFile, vers) {
   printf("Westlichster:  " formatProtDat,\
     exWest["x"], exWest["y"], exWest["z"], exWest["Distanz"] / 1000, exWest["Azi"], ekrref(exWest["Distanz"]), exWest["z"] - z) > protFile;
   printf("Hoechster:     " formatProtDat,\
-    xyHoe[1], xyHoe[2], exHoe["z"], exHoe["Distanz"] / 1000, exHoe["Azi"], ekrref(exHoe["Distanz"]), exHoe["z"] - z)            > protFile;
+    exHoe["x"], exHoe["y"], exHoe["z"], exHoe["Distanz"] / 1000, exHoe["Azi"], ekrref(exHoe["Distanz"]), exHoe["z"] - z)        > protFile;
   printf("Entferntester: " formatProtDat,\
-    xyEntf[1], xyEntf[2], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z)     > protFile;
+    exEntf["x"], exEntf["y"], exEntf["z"], exEntf["Distanz"] / 1000, exEntf["Azi"], ekrref(exEntf["Distanz"]), exEntf["z"] - z) > protFile;
 }
 
 ##### skyplot #####
@@ -1427,18 +1415,18 @@ function tan(winkel) {
   return sin(winkel) / cos(winkel);
 }
 
-function ankatheteAusHypotenuseUndWinkel(c, winkelGon) {
+function ankathAusHypothUndAlpha(c, winkelGon) {
   return c * sin(gon2rad(100 - winkelGon));
 }
 
-function gegenkatheteAusHypotenuseUndWinkel(c, winkelGon) {
+function gegenkathAusHypothUndAlpha(c, winkelGon) {
   return c * sin(gon2rad(winkelGon));
 }
 
-function ankatheteAusGegenkatheteUndWinkel(a, winkelGon) {
+function ankathAusGegenkathUndAlpha(a, winkelGon) {
   return a / tan(gon2rad(winkelGon));
 }
 
-function hypotenuseAusAnkatheteUndWinkel(b, winkelGon) {
+function hypothAusAnkathUndAlpha(b, winkelGon) {
   return b / cos(gon2rad(winkelGon));
 }
