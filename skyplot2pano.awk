@@ -3,7 +3,7 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         28.07.2025
+# Date:         10.08.2025
 # Version:      2.9
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
@@ -29,8 +29,7 @@
 #anzPte          # Anzahl Azimute pro Berechnung
 #anzDhm          # Anzahl eingelesene Hoehenmodelle
 #anzNamFiles     # Anzahl eingelesene Namendateien
-#aufloesAzi      # eingegebene Azimutale Aufloesung in gon
-#aufloesAziCalc  # rekonstuierte Azimutale Aufloesung in gon
+#aufloesAzi      # Azimutale Aufloesung in gon
 #aufloesDist     # Intervalle der Berechnungen in km
 #azi             # Array fuer das Azimut der Skyplot-Ausgabe in gon
 #aziLi           # Azimut links in gon
@@ -154,7 +153,6 @@ BEGIN {
 
     # Berechnung abschliessen
     abschlBer();
-    
   }
 }
 
@@ -408,12 +406,16 @@ function extrBer(    dist0, i, maxRec, maxSicht, N, E, S, W) {
 
 ##### panoBer #####
 # berechnet das Panoramabild
-function panoBer(    abstX, abstY, dist0, distDHMrand, distRel, existiertPkt, i, maxRec, xy, N, E, S, W) {
+function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, existiertPkt, i, maxRec, xy, N, E, S, W) {
 
   # Variablen zum Speichern der Punkte und Namen einrichten
   new(bisherigePte);
   new(bisherigeNamen);
   existiertPkt = 0;
+
+  # Namendaten einlesen, wenn spezifiziert
+  if (namFile != "0")
+    anzNam = namEinlesen(namFile);
 
   # um fehlerhafte Resultate zu vermeiden, muss der unmittelbare Nahbereich unterdrueckt werden
   if (minDist < 500)
@@ -512,7 +514,7 @@ function panoBer(    abstX, abstY, dist0, distDHMrand, distRel, existiertPkt, i,
 
           # Falls ein Namensfile definiert wurde, Namen in perspektivischer Ansicht berechnen
           if (namFile != "0")
-            panoNamBer();
+            panoNamBer(anzNam);
         }
         else
           existiertPkt = 0;
@@ -533,13 +535,8 @@ function panoBer(    abstX, abstY, dist0, distDHMrand, distRel, existiertPkt, i,
 # pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen...
 # ...und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
 # mit Namenscode 99 gekennzeichnete Namen werden in jedem Fall dargestellt
-function panoNamBer(    anzNam, existiertNam, m, nam, namAbstX, namAbstY, namDist, nameHoehe) {
+function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist, nameHoehe) {
   existiertNam = 0;
-
-  # Namendaten einlesen, wenn spezifiziert
-  if (namFile != "0")
-    anzNam = namEinlesen(namFile);
-
   for (nam = 1; nam <= anzNam; nam++) {
     # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten oder Namenscode 99 suchen
     if ((((xyPt["x"] - namX[nam]) >= (toleranz * -1) && (xyPt["x"] - namX[nam]) <= toleranz) || namCode[nam] == 99) && namCode[nam] != 98) {
@@ -629,7 +626,7 @@ function abschlBer(    berD, protokoll) {
   berD = convertsecs(systime() - start);
   
   printf("\n%s\n", rep(45, "*"))
-  printf("Dauer der Berechnung: %s\n", berD);
+  printf("Dauer der Berechnung: %s", berD);
   printf("%s\n", rep(45, "*"))
 
   # Berechnungsprotokoll erstellen
@@ -673,7 +670,7 @@ function convertsecs(sec,    h, m, s) {
   h = sec / 3600;
   m = (sec % 3600) / 60;
   s = sec % 60;
-  return sprintf("%02d Std. %02d Min. %02d Sek.", h, m, s);
+  return sprintf("%02d Std. %02d Min. %02d Sek.\n", h, m, s);
 }
 
 ##### copy #####
@@ -1286,7 +1283,7 @@ function prot(protFile, vers, berD) {
   printf("Projektionszylinderradius           :  %.3f mm\n", radPr)                              > protFile;
   printf("Effektive azimutale Aufloesung      :  %.5f gon\n", aufloesAziCalc)                    > protFile;
   printf("Anzahl Berechnungen                 :  %d\n", anzBer)                                  > protFile;
-  printf("Berechnungsdauer                    :  %s\n", berD)                                    > protFile;
+  printf("Berechnungsdauer                    :  %s", berD)                                      > protFile;
   printf("\n\n\nTopographische Extrempunkte\n")                                                  > protFile;
   printf("%s\n\n", rep(27, "*"))                                                                 > protFile;
   printf("Extrempunkt    " formatProtTxt,\
