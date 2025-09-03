@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         28.08.2025
-# Version:      2.11
+# Date:         24.08.2025
+# Version:      2.10
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -42,7 +42,7 @@
 #dhmKuerz        # Array fuer die Kuerzel der verfuegbaren Hoehenmodelle
 #dhmPfad         # Array fuer die Ablage der verfuegbaren Hoehenmodelle
 #distanz         # Array fuer die Distanz der Skyplot-Ausgabe in der Einheit des Koordinatensystems
-#dxfLayer        # verwendete Layer der DXF-Datei
+#distRelDiv      # Hilfswert, um Silhouettenpunkte relativen Werten zuzuordnen
 #exEntf          # Array fuer die Daten des entferntesten Extrempunktes
 #exHoe           # Array fuer die Daten des hoechsten Extrempunktes
 #exNord          # Array fuer die Daten des noerdlichen Extrempunktes
@@ -108,7 +108,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.11";
+  version = "2.10";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -294,6 +294,10 @@ function datVorb() {
   }
   else
     print "\n...Berechnung ohne Namen...\n";
+
+  # aus 'minDist' und 'maxDist' einen Hilfswert ableiten, um spaeter die einzelnen Punkte den
+  # relative Werten 0 bis 10 zuzuweisen (0 = naheliegendst, 10 = entferntest)
+  distRelDiv = (maxDist - minDist) / 10;
 }
 
 ##### extrBer #####
@@ -406,7 +410,7 @@ function extrBer(    dist0, i, maxRec, maxSicht, N, E, S, W) {
 
 ##### panoBer #####
 # berechnet das Panoramabild
-function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelDiv, existiertPkt, i, maxRec, xy, xyConcat, N, E, S, W) {
+function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, existiertPkt, i, maxRec, xy, xyConcat, N, E, S, W) {
 
   # Variablen zum Speichern der Punkte und Namen einrichten
   new(bisherigePte);
@@ -420,10 +424,6 @@ function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelD
   # um fehlerhafte Resultate zu vermeiden, muss der unmittelbare Nahbereich unterdrueckt werden
   if (minDist < 500)
     minDist = 500;
-
-  # aus 'minDist' und der maximal ermittelten Distanz einen Hilfswert ableiten, um spaeter die einzelnen Punkte den
-  # relative Werten 0 bis 9 zuzuweisen (0 = naheliegendst, 9 = entferntest)
-  distRelDiv = (exEntf["Distanz"] - minDist) / 9;
 
   # Berechnungen im Abstand von 'aufloesDist' durchfuehren, bis 'maxDist' erreicht ist
   for (i = minDist; i <= maxDist; i += aufloesDist) {
@@ -504,7 +504,7 @@ function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelD
           xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
 
           # Punkt in Panoramadatei schreiben
-          distRel = round((i - minDist) / distRelDiv); # relativen Distanzwert zwischen 0 und 9 ermitteln
+          distRel = round((i - minDist) / distRelDiv);
           xyConcat = xyPt["x"] " "  xyPt["y"];
           printf(formatSilDat, abstX, abstY, xyPt["x"], xyPt["y"], xyPt["z"], xyConcat, distanz[j], azi[j], hoehenwinkel[j], i, distRel) > panoFile;
 
@@ -539,7 +539,6 @@ function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelD
 # berechnet die Namen im Panoramabild
 # pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen...
 # ...und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
-# mit Namenscode 98 gekennzeichnete Namen werden nicht dargestellt
 # mit Namenscode 99 gekennzeichnete Namen werden in jedem Fall dargestellt
 function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist, nameHoehe) {
   existiertNam = 0;
@@ -580,14 +579,6 @@ function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist
 # zusaetzlich werden die Silhouettenpunkte aus der Silhouetten-Ergebnisdatei gelesen und als Punkte integriert
 function dxfBer(    anzNam, anzPte, erwOben, erwRechts, i, namRe) {
 
-  # verwendete DXF Layer auflisten
-  dxfLayer[0] = "BERGNAME";
-  dxfLayer[1] = "BERGNAME_99";
-  dxfLayer[2] = "HORIZONT";
-  dxfLayer[3] = "RAHMEN";
-  dxfLayer[4] = "ZUORDNUNGSLINIE";
-  dxfLayer[5] = "ZUORDNUNGSLINIE_99"; 
-
   # Namen-Ergebnisfile der Panoramaberechnung einlesen
   anzNam = namTmpEinlesen(namTmpFile);
 
@@ -606,38 +597,36 @@ function dxfBer(    anzNam, anzPte, erwOben, erwRechts, i, namRe) {
 
   # DXF aufbauen
   dxfHeader(namDXFFile, minX, minY, maxX, maxY + erwOben);
-  dxfTables(namDXFFile, dxfLayer);
+  dxfInhalt(namDXFFile);
 
-  # Rahmen und Horizont
-  dxfLines(namDXFFile, minX, 0, 20, 0, dxfLayer[2]);                             # Horizontlinie links
-  dxfLines(namDXFFile, maxX - 20, 0, maxX, 0, dxfLayer[2]);                      # Horizontlinie rechts
+  dxfLinien(namDXFFile, minX, 0, 20, 0, "HORIZONT");                           # Horizontlinie links
+  dxfLinien(namDXFFile, maxX - 20, 0, maxX, 0, "HORIZONT");                    # Horizontlinie rechts
 
-  dxfLines(namDXFFile, minX, minY, minX, maxY + erwOben, dxfLayer[3]);           # vertikale Linie links
-  dxfLines(namDXFFile, maxX, minY, maxX, maxY + erwOben, dxfLayer[3]);           # vertikale Linie rechts
-  dxfLines(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, dxfLayer[3]); # horizontale Linie oben
-  dxfLines(namDXFFile, maxX, minY, minX, minY, dxfLayer[3]);                     # horizontale Linie unten
+  dxfLinien(namDXFFile, minX, minY, minX, maxY + erwOben, "RAHMEN");           # vertikale Linie links
+  dxfLinien(namDXFFile, maxX, minY, maxX, maxY + erwOben, "RAHMEN");           # vertikale Linie rechts
+  dxfLinien(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, "RAHMEN"); # horizontale Linie oben
+  dxfLinien(namDXFFile, maxX, minY, minX, minY, "RAHMEN");                     # horizontale Linie unten
 
-  dxfAnno(namDXFFile, minX + 3, 1, 0 , "Horizont", dxfLayer[2]);                 # Text "Horizont" links
-  dxfAnno(namDXFFile, maxX - 16, 1, 0 , "Horizont", dxfLayer[2]);                # Text "Horizont" rechts
+  dxfTexte(namDXFFile, minX + 3, 1, 0 , "Horizont", "HORIZONT");               # Text "Horizont" links
+  dxfTexte(namDXFFile, maxX - 16, 1, 0 , "Horizont", "HORIZONT");              # Text "Horizont" rechts
 
-  # Zuordnungslinien und Bergnamen
   for (i = 1; i <= anzNam; i++)
     if (namtC[i] == 99)
-      dxfLines(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[5]);
+      dxfLinien(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, "ZUORDNUNGSLINIE_99");
     else
-      dxfLines(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[4]);
+      dxfLinien(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, "ZUORDNUNGSLINIE");
   for (i = 1; i <= anzNam; i++)
     if (namtC[i] == 99)
-      dxfAnno(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[1]);
+      dxfTexte(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), "BERGNAME_99");
     else
-      dxfAnno(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[0]);
+      dxfTexte(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), "BERGNAME");
 
-  # Silhouettenpunkte
+  # Silhouettenpunkte ebenfalls ins DXF schreiben
   anzPte = panoEinlesen(panoFile);
   for (i = 1; i <= anzPte; i++)
-    dxfPoints(namDXFFile, panoX[i], panoY[i], panoLage[i], panoDiRel[i]);
+    dxfPunkte(namDXFFile, panoX[i], panoY[i], panoLage[i], panoDiRel[i]);
 
-  dxfEnd(namDXFFile);
+  dxfAbschluss(namDXFFile);
 }
 
 ##### abschlBer #####
@@ -736,12 +725,24 @@ function username(    cmd) {
 ########## DXF-Funktionen ##########
 
 ##### dxfHeader #####
-# erzeugt die Header Section der DXF-Datei
+# erzeugt den Header der DXF-Datei
 function dxfHeader(dxfFile, minX, minY, maxX, maxY) {
   printf("  0\n")             > dxfFile;
   printf("SECTION\n")         > dxfFile;
   printf("  2\n")             > dxfFile;
   printf("HEADER\n")          > dxfFile;
+  printf("  9\n")             > dxfFile;
+  printf("$ACADVER\n")        > dxfFile;
+  printf("  1\n")             > dxfFile;
+  printf("AC1009\n")          > dxfFile;
+  printf("  9\n")             > dxfFile;
+  printf("$INSBASE\n")        > dxfFile;
+  printf(" 10\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
+  printf(" 20\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
+  printf(" 30\n")             > dxfFile;
+  printf("0.0\n")             > dxfFile;
   printf("  9\n")             > dxfFile;
   printf("$EXTMIN\n")         > dxfFile;
   printf(" 10\n")             > dxfFile;
@@ -767,65 +768,23 @@ function dxfHeader(dxfFile, minX, minY, maxX, maxY) {
   close(dxfFile);
 }
 
-##### dxfTables #####
-# erzeugt die Tables Section der DXF-Datei
-function dxfTables(dxfFile, dxfLayer,    i) {
-  printf("  0\n")                >> dxfFile;
-  printf("SECTION\n")            >> dxfFile;
-  printf("  2\n")                >> dxfFile;
-  printf("TABLES\n")             >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  printf("TABLE\n")              >> dxfFile;
-  printf("  2\n")                >> dxfFile;
-  printf("LAYER\n")              >> dxfFile;
-  printf(" 70\n")                >> dxfFile;
-  printf("  2\n")                >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  printf("LAYER\n")              >> dxfFile;
-  printf("  2\n")                >> dxfFile;
-  printf("0\n")                  >> dxfFile;
-  printf(" 70\n")                >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  printf(" 62\n")                >> dxfFile;
-  printf("  7\n")                >> dxfFile;
-  printf("  6\n")                >> dxfFile;
-  printf("CONTINUOUS\n")         >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  for (i in dxfLayer) {
-    printf("LAYER\n")            >> dxfFile;
-    printf("  2\n")              >> dxfFile;
-    printf("%s\n", dxfLayer[i])  >> dxfFile;
-    printf(" 70\n")              >> dxfFile;
-    printf(" 64\n")              >> dxfFile;
-    printf(" 62\n")              >> dxfFile;
-    printf("  7\n")              >> dxfFile;
-    printf("  6\n")              >> dxfFile;
-    printf("CONTINUOUS\n")       >> dxfFile;
-    printf("  0\n")              >> dxfFile;  
-  }
-  printf("ENDTAB\n")             >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  printf("ENDSEC\n")             >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  printf("SECTION\n")            >> dxfFile;
-  printf("  2\n")                >> dxfFile;
-  printf("BLOCKS\n")             >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  printf("ENDSEC\n")             >> dxfFile;
-  printf("  0\n")                >> dxfFile;
-  printf("SECTION\n")            >> dxfFile;
-  printf("  2\n")                >> dxfFile;
-  printf("ENTITIES\n")           >> dxfFile;
+##### dxfInhalt #####
+# erzeugt den Beginn des Inhaltsbereiches der DXF-Datei
+function dxfInhalt(dxfFile) {
+  printf("  0\n")             >> dxfFile;
+  printf("SECTION\n")         >> dxfFile;
+  printf("  2\n")             >> dxfFile;
+  printf("ENTITIES\n")        >> dxfFile;
   close(dxfFile);
 }
 
-##### dxfPoints #####
+##### dxfPunkte #####
 # erzeugt die Punkte der DXF-Datei
-function dxfPoints(dxfFile, x, y, layer, color) {
+function dxfPunkte(dxfFile, x, y, typ, color) {
   printf("  0\n")                  >> dxfFile;
   printf("POINT\n")                >> dxfFile;
   printf("  8\n")                  >> dxfFile;
-  printf("%s\n", layer)            >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
   printf(" 10\n")                  >> dxfFile;
   printf("%.1f\n", x)              >> dxfFile;
   printf(" 20\n")                  >> dxfFile;
@@ -835,17 +794,17 @@ function dxfPoints(dxfFile, x, y, layer, color) {
   printf(" 39\n")                  >> dxfFile;
   printf("0.000000000\n")          >> dxfFile;
   printf(" 62\n")                  >> dxfFile;
-  printf("%.9f\n", color + 1)      >> dxfFile; # Wert um 1 erhoehen, da Color nicht 0 sein darf
+  printf("%.9f\n", color)          >> dxfFile;
   close(dxfFile);
 }
 
-##### dxfLines #####
+##### dxfLinien #####
 # erzeugt die Linien der DXF-Datei
-function dxfLines(dxfFile, x1, y1, x2, y2, layer) {
+function dxfLinien(dxfFile, x1, y1, x2, y2, typ) {
   printf("  0\n")                  >> dxfFile;
   printf("POLYLINE\n")             >> dxfFile;
   printf("  8\n")                  >> dxfFile;
-  printf("%s\n", layer)            >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
   printf(" 66\n")                  >> dxfFile;
   printf("     1\n")               >> dxfFile;
   printf(" 10\n")                  >> dxfFile;
@@ -859,7 +818,7 @@ function dxfLines(dxfFile, x1, y1, x2, y2, layer) {
   printf("  0\n")                  >> dxfFile;
   printf("VERTEX\n")               >> dxfFile;
   printf("  8\n")                  >> dxfFile;
-  printf("%s\n", layer)            >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
   printf(" 66\n")                  >> dxfFile;
   printf("     1\n")               >> dxfFile;
   printf(" 10\n")                  >> dxfFile;
@@ -871,7 +830,7 @@ function dxfLines(dxfFile, x1, y1, x2, y2, layer) {
   printf("  0\n")                  >> dxfFile;
   printf("VERTEX\n")               >> dxfFile;
   printf("  8\n")                  >> dxfFile;
-  printf("%s\n", layer)            >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
   printf(" 66\n")                  >> dxfFile;
   printf("     1\n")               >> dxfFile;
   printf(" 10\n")                  >> dxfFile;
@@ -883,17 +842,17 @@ function dxfLines(dxfFile, x1, y1, x2, y2, layer) {
   printf("  0\n")                  >> dxfFile;
   printf("SEQEND\n")               >> dxfFile;
   printf("  8\n")                  >> dxfFile;
-  printf("%s\n", layer)            >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
   close(dxfFile);
 }
 
-##### dxfAnno #####
-# erzeugt die Annotations (Schriften) der DXF-Datei
-function dxfAnno(dxfFile, x, y, angle, text, layer) {
+##### dxfTexte #####
+# erzeugt die Schriften der DXF-Datei
+function dxfTexte(dxfFile, x, y, winkel, text, typ) {
   printf("  0\n")                  >> dxfFile;
   printf("TEXT\n")                 >> dxfFile;
   printf("  8\n")                  >> dxfFile;
-  printf("%s\n", layer)            >> dxfFile;
+  printf("%s\n", typ)              >> dxfFile;
   printf(" 10\n")                  >> dxfFile;
   printf("%.1f\n", x)              >> dxfFile;
   printf(" 20\n")                  >> dxfFile;
@@ -903,15 +862,15 @@ function dxfAnno(dxfFile, x, y, angle, text, layer) {
   printf(" 40\n")                  >> dxfFile;
   printf("3\n")                    >> dxfFile;
   printf(" 50\n")                  >> dxfFile;
-  printf("%d\n", angle)            >> dxfFile;
+  printf("%d\n", winkel)           >> dxfFile;
   printf("  1\n")                  >> dxfFile;
   printf("%s\n", text)             >> dxfFile;
   close(dxfFile);
 }
 
-##### dxfEnd #####
+##### dxfAbschluss #####
 # beendet den Aufbau der DXF-Datei
-function dxfEnd(dxfFile) {
+function dxfAbschluss(dxfFile) {
   printf("  0\n")             >> dxfFile;
   printf("ENDSEC\n")          >> dxfFile;
   printf("  0\n")             >> dxfFile;
@@ -1296,17 +1255,13 @@ function panoEinlesen(panoFile,    i) {
   new(panoX);
   new(panoY);
   new(panoLage);
-  new(panoDiRel);
   i = 0;
   while ((getline < panoFile) > 0) {
     if (i > 0) {
       panoX[i] = $1;
-	  panoX[i] = panoX[i] + 0;
       panoY[i] = $2;
-	  panoY[i] = panoY[i] + 0;
       panoLage[i] = $6;
       panoDiRel[i] = $11;
-	  panoDiRel[i] = panoDiRel[i] + 0;
     }
     i++;
   }

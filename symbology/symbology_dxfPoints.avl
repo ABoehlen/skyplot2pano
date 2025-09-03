@@ -10,22 +10,21 @@
 	ClassType:	0x03
 	FieldNames:	3
 	Symbols:	4
+	Class:	82
+	Class:	83
+	Class:	84
+	Class:	85
+	Class:	86
+	Class:	87
+	Class:	88
 	Class:	89
 	Class:	90
 	Class:	91
 	Class:	92
-	Class:	93
-	Class:	94
-	Class:	95
-	Class:	96
-	Class:	97
-	Class:	98
-	Class:	99
-	Class:	100
 	StdDevs:	1.00000000000000
-	NullSym:	101
-	NullValues:	108
-	StatValues:	109
+	NullSym:	93
+	NullValues:	100
+	StatValues:	101
 	ScaleSymbols:	1
 	RefScale:	1000.00000000000000
 	Precision:	-3
@@ -47,7 +46,6 @@
 	Child:	61
 	Child:	68
 	Child:	75
-	Child:	82
 )
 
 (BMkSym.5
@@ -414,12 +412,13 @@
 	Color:	76
 	BgColor:	77
 	Font:	78
-	Size:	1.00000000000000
+	Size:	8.00000000000000
 	Pattern:	35
 	Angle:	360.00000000000000
 )
 
 (TClr.76
+	Name:	"Transparent"
 )
 
 (TClr.77
@@ -446,165 +445,123 @@
 	S:	"Normal"
 )
 
-(BMkSym.82
-	Color:	83
-	BgColor:	84
-	Font:	85
-	Size:	8.00000000000000
-	Pattern:	35
-	Angle:	360.00000000000000
-)
-
-(TClr.83
-	Name:	"Transparent"
-)
-
-(TClr.84
-	Name:	"Transparent"
-)
-
-(NFont.85
-	Family:	86
-	Name:	87
-	Style:	88
-	Weight:	1
-	Wideness:	1
-)
-
-(AVStr.86
-	S:	"ESRI Geometric Symbols"
-)
-
-(AVStr.87
-	S:	"ESRI Geometric Symbols"
-)
-
-(AVStr.88
-	S:	"Normal"
-)
-
-(LClass.89
-	Label:	"0"
-	Precision:	-3
-)
-
-(LClass.90
+(LClass.82
 	Label:	"1"
 	MinNum:	1.00000000000000
 	MaxNum:	1.00000000000000
 	Precision:	-3
 )
 
-(LClass.91
+(LClass.83
 	Label:	"2"
 	MinNum:	2.00000000000000
 	MaxNum:	2.00000000000000
 	Precision:	-3
 )
 
-(LClass.92
+(LClass.84
 	Label:	"3"
 	MinNum:	3.00000000000000
 	MaxNum:	3.00000000000000
 	Precision:	-3
 )
 
-(LClass.93
+(LClass.85
 	Label:	"4"
 	MinNum:	4.00000000000000
 	MaxNum:	4.00000000000000
 	Precision:	-3
 )
 
-(LClass.94
+(LClass.86
 	Label:	"5"
 	MinNum:	5.00000000000000
 	MaxNum:	5.00000000000000
 	Precision:	-3
 )
 
-(LClass.95
+(LClass.87
 	Label:	"6"
 	MinNum:	6.00000000000000
 	MaxNum:	6.00000000000000
 	Precision:	-3
 )
 
-(LClass.96
+(LClass.88
 	Label:	"7"
 	MinNum:	7.00000000000000
 	MaxNum:	7.00000000000000
 	Precision:	-3
 )
 
-(LClass.97
+(LClass.89
 	Label:	"8"
 	MinNum:	8.00000000000000
 	MaxNum:	8.00000000000000
 	Precision:	-3
 )
 
-(LClass.98
+(LClass.90
 	Label:	"9"
 	MinNum:	9.00000000000000
 	MaxNum:	9.00000000000000
 	Precision:	-3
 )
 
-(LClass.99
+(LClass.91
 	Label:	"10"
 	MinNum:	10.00000000000000
 	MaxNum:	10.00000000000000
 	Precision:	-3
 )
 
-(LClass.100
+(LClass.92
 	IsNoData:	1
 	Label:	"No Data"
 	MaxNum:	-1.00000000000000
 	Precision:	-3
 )
 
-(BMkSym.101
-	Color:	102
-	BgColor:	103
-	Font:	104
+(BMkSym.93
+	Color:	94
+	BgColor:	95
+	Font:	96
 	Size:	8.00000000000000
 	Pattern:	35
 	Angle:	360.00000000000000
 )
 
-(TClr.102
+(TClr.94
 	Name:	"Transparent"
 )
 
-(TClr.103
+(TClr.95
 	Name:	"Transparent"
 )
 
-(NFont.104
-	Family:	105
-	Name:	106
-	Style:	107
+(NFont.96
+	Family:	97
+	Name:	98
+	Style:	99
 	Weight:	1
 	Wideness:	1
 )
 
-(AVStr.105
+(AVStr.97
 	S:	"ESRI Geometric Symbols"
 )
 
-(AVStr.106
+(AVStr.98
 	S:	"ESRI Geometric Symbols"
 )
 
-(AVStr.107
+(AVStr.99
 	S:	"Normal"
 )
 
-(NameDict.108
+(NameDict.100
 )
 
-(NameDict.109
+(NameDict.101
 )
 
