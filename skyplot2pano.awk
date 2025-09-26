@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         28.08.2025
-# Version:      2.11
+# Date:         23.09.2025
+# Version:      2.12
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -84,6 +84,7 @@
 #namTmpFile      # temporaere Datei mit den darzustellenden Namen
 #oeffWink        # Oeffnungswinkel in gon
 #panoFile        # Panorama (Silhouetten)-Datei
+#panoDist        # Array fuer den Distanzwert in km zu jedem Punkt im Panoramabild
 #panoDiRel       # Array fuer den relativen Distanzwert des Silhouettenpunktes
 #panoX           # Array fuer die X-Bildkoordinaten des Panoramabildes
 #panoY           # Array fuer die Y-Bildkoordinaten des Panoramabildes
@@ -108,7 +109,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.11";
+  version = "2.12";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -635,7 +636,7 @@ function dxfBer(    anzNam, anzPte, erwOben, erwRechts, i, namRe) {
   # Silhouettenpunkte
   anzPte = panoEinlesen(panoFile);
   for (i = 1; i <= anzPte; i++)
-    dxfPoints(namDXFFile, panoX[i], panoY[i], panoLage[i], panoDiRel[i]);
+    dxfPoints(namDXFFile, panoX[i], panoY[i], panoLage[i], panoDiRel[i], panoDist[i]);
 
   dxfEnd(namDXFFile);
 }
@@ -821,21 +822,21 @@ function dxfTables(dxfFile, dxfLayer,    i) {
 
 ##### dxfPoints #####
 # erzeugt die Punkte der DXF-Datei
-function dxfPoints(dxfFile, x, y, layer, color) {
-  printf("  0\n")                  >> dxfFile;
-  printf("POINT\n")                >> dxfFile;
-  printf("  8\n")                  >> dxfFile;
-  printf("%s\n", layer)            >> dxfFile;
-  printf(" 10\n")                  >> dxfFile;
-  printf("%.1f\n", x)              >> dxfFile;
-  printf(" 20\n")                  >> dxfFile;
-  printf("%.1f\n", y)              >> dxfFile;
-  printf(" 30\n")                  >> dxfFile;
-  printf("0.000000000\n")          >> dxfFile;
-  printf(" 39\n")                  >> dxfFile;
-  printf("0.000000000\n")          >> dxfFile;
-  printf(" 62\n")                  >> dxfFile;
-  printf("%.9f\n", color + 1)      >> dxfFile; # Wert um 1 erhoehen, da Color nicht 0 sein darf
+function dxfPoints(dxfFile, x, y, layer, color, elevation) {
+  printf("  0\n")                    >> dxfFile;
+  printf("POINT\n")                  >> dxfFile;
+  printf("  8\n")                    >> dxfFile;
+  printf("%s\n", layer)              >> dxfFile;
+  printf(" 10\n")                    >> dxfFile;
+  printf("%.1f\n", x)                >> dxfFile;
+  printf(" 20\n")                    >> dxfFile;
+  printf("%.1f\n", y)                >> dxfFile;
+  printf(" 38\n")                    >> dxfFile;
+  printf("%.9f\n", elevation / 1000) >> dxfFile; # Wert durch 1000 teilen, um km zu erhalten
+  printf(" 39\n")                    >> dxfFile;
+  printf("0.000000000\n")            >> dxfFile;
+  printf(" 62\n")                    >> dxfFile;
+  printf("%.9f\n", color + 1)        >> dxfFile; # Wert um 1 erhoehen, da Color nicht 0 sein darf
   close(dxfFile);
 }
 
@@ -1272,7 +1273,7 @@ function namTmpEinlesen(namTmpFile,    i) {
     namtY[i] = $5;
     namtY[i] = namtY[i] + 0;
     namtC[i] = $6;
-	namtC[i] = namtC[i] + 0;
+    namtC[i] = namtC[i] + 0;
   }
   close(namTmpFile);
   return i;
@@ -1290,23 +1291,27 @@ function namKopieren(namTyp,    i) {
 # einlesen des angegebenen Pano-Silhouettenfiles
 # aus den Bildkoordinaten die Arrays 'panoX' und 'panoY' bilden
 # die konkatenierten Lagekoordinaten ins Array 'panoLage' eintragen
+# die Distanz zum Punkt wird ins Array 'panoDist' eingetragen
 # der relative Distanzwert wird ins Array 'panoDiRel' eingetragen
 # Anzahl Datenzeilen zurueckliefern
 function panoEinlesen(panoFile,    i) {
   new(panoX);
   new(panoY);
   new(panoLage);
+  new(panoDist);
   new(panoDiRel);
   i = 0;
   while ((getline < panoFile) > 0) {
     if (i > 0) {
       panoX[i] = $1;
-	  panoX[i] = panoX[i] + 0;
+      panoX[i] = panoX[i] + 0;
       panoY[i] = $2;
-	  panoY[i] = panoY[i] + 0;
+      panoY[i] = panoY[i] + 0;
       panoLage[i] = $6;
+      panoDist[i] = $7;
+      panoDist[i] = panoDist[i] + 0;
       panoDiRel[i] = $11;
-	  panoDiRel[i] = panoDiRel[i] + 0;
+      panoDiRel[i] = panoDiRel[i] + 0;
     }
     i++;
   }
