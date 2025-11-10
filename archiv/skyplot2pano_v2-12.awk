@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         10.11.2025
-# Version:      2.13
+# Date:         23.09.2025
+# Version:      2.12
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -15,7 +15,6 @@
 #               - die zu verwendenden Hoehenmodelle muessen im Format SCOP RDH vorliegen
 #               - die Parameter der verwendeten Hoehenmodelle muessen in der Datei 'dhm.txt' festgelegt werden
 #               - die Parameter der verwendeten Namensfiles muessen in der Datei 'nam.txt' festgelegt werden
-#               - diverse Parameter muessen in der Datei 'params.txt' festgelegt werden
 #               - die Pfade zu diesen beiden Textdateien sind in den Zeilen 38 und 42 festzulegen
 #               - die verwendeten Namensfiles muessen im gleich strukturierten Textformat vorliegen wie fuer die Benutzung mit SCOP.PER
 #               - das SCOP Utility Programm 'skyplot.exe' muss vorhanden und über den Befehl 'skyplot' aufrufbar sein
@@ -27,10 +26,9 @@
 ########## globale Variablen und ihre Bedeutung ##########
 
 #anzBer          # Anzahl Berechnungen pro Panoramabild
+#anzPte          # Anzahl Azimute pro Berechnung
 #anzDhm          # Anzahl eingelesene Hoehenmodelle
 #anzNamFiles     # Anzahl eingelesene Namendateien
-#anzPar          # Anzahl diverser Parameter
-#anzPte          # Anzahl Azimute pro Berechnung
 #aufloesAzi      # Azimutale Aufloesung in gon
 #aufloesDist     # Intervalle der Berechnungen in km
 #azi             # Array fuer das Azimut der Skyplot-Ausgabe in gon
@@ -81,17 +79,16 @@
 #namZ            # Array fuer die Namen-Z-Koordinaten der eingelesenen Namendatei
 #namtZ           # Array fuer die Namen-Z-Koordinaten der eingelesenen temporaeren Namendatei
 #name            # Name Projektionszentrum
+#namDXFFile      # DXF-Datei mit Namen, Linien, Horizont und Rahmen
 #namFile         # Namendatei
 #namTmpFile      # temporaere Datei mit den darzustellenden Namen
 #oeffWink        # Oeffnungswinkel in gon
 #panoFile        # Panorama (Silhouetten)-Datei
-#panoDXFFile     # DXF-Datei mit Silhouetten-Punkten, Namen, Linien, Horizont und Rahmen
 #panoDist        # Array fuer den Distanzwert in km zu jedem Punkt im Panoramabild
 #panoDiRel       # Array fuer den relativen Distanzwert des Silhouettenpunktes
 #panoX           # Array fuer die X-Bildkoordinaten des Panoramabildes
 #panoY           # Array fuer die Y-Bildkoordinaten des Panoramabildes
 #panoLage        # Array fuer die Lagekoordinaten jedes Punktes des Panoramabildes
-#params          # Array mit diversen Parametern
 #radPr           # Radius des Projektionszylinders in mm
 #resFile         # Input-File fuer SCOP Skyplot
 #start           # Zeitstempel Beginn
@@ -112,7 +109,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.13";
+  version = "2.12";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -124,10 +121,6 @@ BEGIN {
   # Liste der verfuegbaren Namensfiles einlesen
   copy("$SCOP_ROOT/scop/util/nam.txt", ".", "Konfigurationsdatei nam.txt existiert nicht");
   anzNamFiles = namListeEinlesen("nam.txt");
-
-  # diverse Parameter einlesen
-  copy("$SCOP_ROOT/scop/util/params.txt", ".", "Konfigurationsdatei params.txt existiert nicht");
-  anzPar = paramListeEinlesen("params.txt");
 
   # Usage ausgeben, wenn zuwenig Argumente
   if (ARGC < 15) { 
@@ -294,10 +287,10 @@ function datVorb() {
   panoFile = "sil_" name "_" aziLi "-" aziRe ".txt"
   printf(formatSilTxt, "X", "Y", "LageX", "LageY", "LageZ", "LageX LageY", "Dist", "Azi", "HWink", "Limit", "DiRel") > panoFile;
 
-  # DXF-Datei vorbereiten
+  # Namen-Ausgabedateien vorbereiten
   if (namFile != "0") {
     namTmpFile = "namTmp.txt"
-    panoDXFFile = "pano_" name "_" aziLi "-" aziRe ".dxf"
+    namDXFFile = "nam_" name "_" aziLi "-" aziRe ".dxf"
     print "\n...Berechnung mit Namen...\n";
   }
   else
@@ -586,7 +579,7 @@ function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist
 ##### dxfBer #####
 # berechnet das DXF-File mit Namen und Zuordnungslinien aus dem Namen-Ergebnisfile der Panoramaberechnung
 # zusaetzlich werden die Silhouettenpunkte aus der Silhouetten-Ergebnisdatei gelesen und als Punkte integriert
-function dxfBer(    anzNam, anzPte, i, namRe) {
+function dxfBer(    anzNam, anzPte, erwOben, erwRechts, i, namRe) {
 
   # verwendete DXF Layer auflisten
   dxfLayer[0] = "BERGNAME";
@@ -599,49 +592,53 @@ function dxfBer(    anzNam, anzPte, i, namRe) {
   # Namen-Ergebnisfile der Panoramaberechnung einlesen
   anzNam = namTmpEinlesen(namTmpFile);
 
-  # Pruefen, ob Namen nahe des rechten Bildrandes liegen, und falls ja, Rand um den festgelegten Wert nach rechts erweitern
+  # Zuschlag rechts und oben, damit Texte innerhalb des Rahmens liegen
+  erwRechts = 60;
+  erwOben = 80;
+
+  # Pruefen, ob Namen nahe des rechten Bildrandes liegen, und falls ja, Rand um erwRechts nach rechts erweitern
   namRe = 0;
   for (i = 1; i <= anzNam; i++) {
     if (namtX[i] > namRe)
       namRe = namtX[i];
   }
-  if ((maxX - namRe) < params["erwRahmenRechts"])
-    maxX = maxX + params["erwRahmenRechts"];
+  if ((maxX - namRe) < erwRechts)
+    maxX = maxX + erwRechts;
 
   # DXF aufbauen
-  dxfHeader(panoDXFFile, minX, minY, maxX, maxY + params["erwRahmenOben"]);
-  dxfTables(panoDXFFile, dxfLayer);
+  dxfHeader(namDXFFile, minX, minY, maxX, maxY + erwOben);
+  dxfTables(namDXFFile, dxfLayer);
 
-  # Rahmen um den festgelegten Wert nach oben erweitern und Horizont hinzufuegen
-  dxfLines(panoDXFFile, minX, 0, 20, 0, dxfLayer[2]);                                                             # Horizontlinie links
-  dxfLines(panoDXFFile, maxX - 20, 0, maxX, 0, dxfLayer[2]);                                                      # Horizontlinie rechts
+  # Rahmen und Horizont
+  dxfLines(namDXFFile, minX, 0, 20, 0, dxfLayer[2]);                             # Horizontlinie links
+  dxfLines(namDXFFile, maxX - 20, 0, maxX, 0, dxfLayer[2]);                      # Horizontlinie rechts
 
-  dxfLines(panoDXFFile, minX, minY, minX, maxY + params["erwRahmenOben"], dxfLayer[3]);                           # vertikale Linie links
-  dxfLines(panoDXFFile, maxX, minY, maxX, maxY + params["erwRahmenOben"], dxfLayer[3]);                           # vertikale Linie rechts
-  dxfLines(panoDXFFile, minX, maxY + params["erwRahmenOben"], maxX, maxY + params["erwRahmenOben"], dxfLayer[3]); # horizontale Linie oben
-  dxfLines(panoDXFFile, maxX, minY, minX, minY, dxfLayer[3]);                                                     # horizontale Linie unten
+  dxfLines(namDXFFile, minX, minY, minX, maxY + erwOben, dxfLayer[3]);           # vertikale Linie links
+  dxfLines(namDXFFile, maxX, minY, maxX, maxY + erwOben, dxfLayer[3]);           # vertikale Linie rechts
+  dxfLines(namDXFFile, minX, maxY + erwOben, maxX, maxY + erwOben, dxfLayer[3]); # horizontale Linie oben
+  dxfLines(namDXFFile, maxX, minY, minX, minY, dxfLayer[3]);                     # horizontale Linie unten
 
-  dxfAnno(panoDXFFile, minX + 3, 1, 0 , "Horizont", dxfLayer[2]);                                                 # Text "Horizont" links
-  dxfAnno(panoDXFFile, maxX - 16, 1, 0 , "Horizont", dxfLayer[2]);                                                # Text "Horizont" rechts
+  dxfAnno(namDXFFile, minX + 3, 1, 0 , "Horizont", dxfLayer[2]);                 # Text "Horizont" links
+  dxfAnno(namDXFFile, maxX - 16, 1, 0 , "Horizont", dxfLayer[2]);                # Text "Horizont" rechts
 
   # Zuordnungslinien und Bergnamen
-  for (i = 1; i <= anzNam; i++) {
-    if (namtC[i] == 99) {
-      dxfLines(panoDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[5]);
-      dxfAnno(panoDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[1]);
-    }
-    else {
-      dxfLines(panoDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[4]);
-      dxfAnno(panoDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[0]);
-    }
-  }
+  for (i = 1; i <= anzNam; i++)
+    if (namtC[i] == 99)
+      dxfLines(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[5]);
+    else
+      dxfLines(namDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[4]);
+  for (i = 1; i <= anzNam; i++)
+    if (namtC[i] == 99)
+      dxfAnno(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[1]);
+    else
+      dxfAnno(namDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[0]);
 
   # Silhouettenpunkte
   anzPte = panoEinlesen(panoFile);
   for (i = 1; i <= anzPte; i++)
-    dxfPoints(panoDXFFile, panoX[i], panoY[i], panoLage[i], panoDiRel[i], panoDist[i]);
+    dxfPoints(namDXFFile, panoX[i], panoY[i], panoLage[i], panoDiRel[i], panoDist[i]);
 
-  dxfEnd(panoDXFFile);
+  dxfEnd(namDXFFile);
 }
 
 ##### abschlBer #####
@@ -663,7 +660,6 @@ function abschlBer(    berD, protokoll) {
   # aufraeumen und beenden
   system("rm -f dhm.txt");
   system("rm -f nam.txt");
-  system("rm -f params.txt");
   system("rm -f sky.rdh");
   system("rm -f SKYPLOT.CMD");
   system("rm -f SKYPLOT.LOG");
@@ -1320,29 +1316,6 @@ function panoEinlesen(panoFile,    i) {
     i++;
   }
   close(panoFile);
-  return i - 1;
-}
-
-##### paramListeEinlesen #####
-# einlesen der Liste mit diversen Parametern
-# nur Datenzeilen beruecksichtigen (Zeile 2 ff)
-# aus den Eintraegen das Array 'params' bilden
-# Anzahl Parameter zurueckliefern
-function paramListeEinlesen(paramListe,    i) {
-  new(params);
-  i = 0;
-  while ((getline < paramListe) > 0) {
-    if (i == 0) {
-      i++;
-      continue;
-    }
-    else {
-      gsub(/[ ]+$/,"",$1) # Leerzeichen am Ende entfernen
-      params[$1] = $2 + 0;
-      i++;
-    }
-  }
-  close(paramListe);
   return i - 1;
 }
 

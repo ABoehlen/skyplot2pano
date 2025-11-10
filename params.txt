@@ -1,0 +1,3 @@
+Parameter            ,Wert
+erwRahmenRechts      ,50
+erwRahmenOben        ,80
