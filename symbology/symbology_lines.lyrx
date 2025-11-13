@@ -8,7 +8,7 @@
   "layerDefinitions" : [
     {
       "type" : "CIMFeatureLayer",
-      "name" : "nam_Bellevue_85-185-Polyline",
+      "name" : "Lines",
       "uRI" : "CIMPATH=Map/Polyline.json",
       "sourceModifiedTime" : {
         "type" : "TimeInstant"
@@ -459,8 +459,8 @@
         ],
         "dataConnection" : {
           "type" : "CIMFeatureDatasetDataConnection",
-          "featureDataset" : "nam_Bellevue_85-185.dxf",
-          "workspaceConnectionString" : "DATABASE=.",
+          "featureDataset" : "pano_Heiligenschwendi_125-325.dxf",
+          "workspaceConnectionString" : "DATABASE=Y:\\dhm\\project\\heiligenschwendi",
           "workspaceFactory" : "Cad",
           "dataset" : "Polyline",
           "datasetType" : "esriDTCadDrawing"
@@ -840,6 +840,49 @@
                     "type" : "CIMUniqueValue",
                     "fieldValues" : [
                       "ZUORDNUNGSLINIE"
+                    ]
+                  }
+                ],
+                "visible" : true
+              },
+              {
+                "type" : "CIMUniqueValueClass",
+                "editable" : true,
+                "label" : "HIMMELSRICHTUNG",
+                "patch" : "LineHorizontal",
+                "symbol" : {
+                  "type" : "CIMSymbolReference",
+                  "symbol" : {
+                    "type" : "CIMLineSymbol",
+                    "symbolLayers" : [
+                      {
+                        "type" : "CIMSolidStroke",
+                        "enable" : true,
+                        "capStyle" : "Round",
+                        "joinStyle" : "Round",
+                        "lineStyle3D" : "Strip",
+                        "miterLimit" : 10,
+                        "width" : 1,
+                        "height3D" : 1,
+                        "anchor3D" : "Center",
+                        "color" : {
+                          "type" : "CIMRGBColor",
+                          "values" : [
+                            52,
+                            52,
+                            52,
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "values" : [
+                  {
+                    "type" : "CIMUniqueValue",
+                    "fieldValues" : [
+                      "HIMMELSRICHTUNG"
                     ]
                   }
                 ],

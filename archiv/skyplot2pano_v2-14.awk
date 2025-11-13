@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         13.11.2025
-# Version:      2.15
+# Date:         11.11.2025
+# Version:      2.14
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -26,81 +26,80 @@
 
 ########## globale Variablen und ihre Bedeutung ##########
 
-#anzBer            # Anzahl Berechnungen pro Panoramabild
-#anzDhm            # Anzahl eingelesene Hoehenmodelle
-#anzNamFiles       # Anzahl eingelesene Namendateien
-#anzPte            # Anzahl Azimute pro Berechnung
-#aufloesAzi        # Azimutale Aufloesung in gon
-#aufloesDist       # Intervalle der Berechnungen in km
-#azi               # Array fuer das Azimut der Skyplot-Ausgabe in gon
-#aziLi             # Azimut links in gon
-#aziRe             # Azimut rechts in gon
-#bildbr            # Bildbreite in mm
-#bisherigeNamen    # Array fuer bereits berechnete Namen
-#bisherigePte      # Array fuer bereits berechnete Silhouettenpunkte
-#dhm               # verwendetes Hoehenmodell
-#dhmBeschr         # Array fuer die Beschreibung der verfuegbaren Hoehenmodelle
-#dhmKuerz          # Array fuer die Kuerzel der verfuegbaren Hoehenmodelle
-#dhmPfad           # Array fuer die Ablage der verfuegbaren Hoehenmodelle
-#distanz           # Array fuer die Distanz der Skyplot-Ausgabe in der Einheit des Koordinatensystems
-#dxfLayer          # Array mit den verwendeten Layer der DXF-Datei
-#exEntf            # Array fuer die Daten des entferntesten Extrempunktes
-#exHoe             # Array fuer die Daten des hoechsten Extrempunktes
-#exNord            # Array fuer die Daten des noerdlichen Extrempunktes
-#exOst             # Array fuer die Daten des oestlichen Extrempunktes
-#exSued            # Array fuer die Daten des suedlichen Extrempunktes
-#exWest            # Array fuer die Daten des westlichen Extrempunktes
-#extrFile          # Extrempunkte-Datei
-#formatExtrDat     # Formatierungsstring Extrempunkte Datenzeilen
-#formatExtrTxt     # Formatierungsstring Extrempunkte Titel
-#formatProtDat     # Formatierungsstring Protokoll Datenzeilen
-#formatProtTxt     # Formatierungsstring Protokoll Titel
-#formatSilDat      # Formatierungsstring Silhouetten Datenzeilen
-#formatSilTxt      # Formatierungsstring Silhouetten Titel
-#gonInMM           # mm, die ein gon im Bildkoordinatensystem entspricht
-#himmelsrichtungen # Array mit den gon-Azimuten der Haupt-Himmelsrichtungen
-#hoehenwinkel      # Array fuer den Hoehenwinkel der Skyplot-Ausgabe in gon
-#maxDist           # maximale Distanz in km
-#maxX              # maximale X-Bildkoordinate in mm
-#maxY              # maximale Y-Bildkoordinate in mm
-#minDist           # minimale Distanz in km
-#minX              # minimale X-Bildkoordinate in mm
-#minY              # minimale Y-Bildkoordinate in mm
-#namBeschr         # Array fuer die Beschreibung der verfuegbaren Namendateien
-#namtC             # Array fuer die Namen-Prioritaeten der eingelesenen temporaeren Namendatei
-#namCode           # Array fuer die Namen-Prioritaeten der eingelesenen Namendatei
-#namtD             # Array fuer die Namen-Entfernungen der eingelesenen temporaeren Namendatei
-#namKuerz          # Array fuer die Kuerzel der verfuegbaren Namendateien
-#namName           # Array fuer die Namen der eingelesenen Namendatei
-#namtName          # Array fuer die Namen der eingelesenen temporaeren Namendatei
-#namPfad           # Array fuer die Ablage der verfuegbaren Namendateien
-#namX              # Array fuer die Namen-X-Koordinaten der eingelesenen Namendatei
-#namtX             # Array fuer die Namen-X-Koordinaten der eingelesenen temporaeren Namendatei
-#namY              # Array fuer die Namen-Y-Koordinaten der eingelesenen Namendatei
-#namtY             # Array fuer die Namen-Y-Koordinaten der eingelesenen temporaeren Namendatei
-#namZ              # Array fuer die Namen-Z-Koordinaten der eingelesenen Namendatei
-#namtZ             # Array fuer die Namen-Z-Koordinaten der eingelesenen temporaeren Namendatei
-#name              # Name Projektionszentrum
-#namFile           # Namendatei
-#namTmpFile        # temporaere Datei mit den darzustellenden Namen
-#oeffWink          # Oeffnungswinkel in gon
-#panoFile          # Panorama (Silhouetten)-Datei
-#panoDXFFile       # DXF-Datei mit Silhouetten-Punkten, Namen, Linien, Horizont und Rahmen
-#panoDist          # Array fuer den Distanzwert in km zu jedem Punkt im Panoramabild
-#panoDiRel         # Array fuer den relativen Distanzwert des Silhouettenpunktes
-#panoX             # Array fuer die X-Bildkoordinaten des Panoramabildes
-#panoY             # Array fuer die Y-Bildkoordinaten des Panoramabildes
-#panoLage          # Array fuer die Lagekoordinaten jedes Punktes des Panoramabildes
-#params            # Array mit diversen Parametern
-#radPr             # Radius des Projektionszylinders in mm
-#resFile           # Input-File fuer SCOP Skyplot
-#start             # Zeitstempel Beginn
-#toleranz          # Lagetoleranz bei Namen in der Einheit des Koordinatensystems
-#umfang            # Umfang (400 gon) in mm
-#version           # Applikation Version
-#x                 # X-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
-#y                 # Y-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
-#z                 # Z-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
+#anzBer          # Anzahl Berechnungen pro Panoramabild
+#anzDhm          # Anzahl eingelesene Hoehenmodelle
+#anzNamFiles     # Anzahl eingelesene Namendateien
+#anzPte          # Anzahl Azimute pro Berechnung
+#aufloesAzi      # Azimutale Aufloesung in gon
+#aufloesDist     # Intervalle der Berechnungen in km
+#azi             # Array fuer das Azimut der Skyplot-Ausgabe in gon
+#aziLi           # Azimut links in gon
+#aziRe           # Azimut rechts in gon
+#bildbr          # Bildbreite in mm
+#bisherigeNamen  # Array fuer bereits berechnete Namen
+#bisherigePte    # Array fuer bereits berechnete Silhouettenpunkte
+#dhm             # verwendetes Hoehenmodell
+#dhmBeschr       # Array fuer die Beschreibung der verfuegbaren Hoehenmodelle
+#dhmKuerz        # Array fuer die Kuerzel der verfuegbaren Hoehenmodelle
+#dhmPfad         # Array fuer die Ablage der verfuegbaren Hoehenmodelle
+#distanz         # Array fuer die Distanz der Skyplot-Ausgabe in der Einheit des Koordinatensystems
+#dxfLayer        # verwendete Layer der DXF-Datei
+#exEntf          # Array fuer die Daten des entferntesten Extrempunktes
+#exHoe           # Array fuer die Daten des hoechsten Extrempunktes
+#exNord          # Array fuer die Daten des noerdlichen Extrempunktes
+#exOst           # Array fuer die Daten des oestlichen Extrempunktes
+#exSued          # Array fuer die Daten des suedlichen Extrempunktes
+#exWest          # Array fuer die Daten des westlichen Extrempunktes
+#extrFile        # Extrempunkte-Datei
+#formatExtrDat   # Formatierungsstring Extrempunkte Datenzeilen
+#formatExtrTxt   # Formatierungsstring Extrempunkte Titel
+#formatProtDat   # Formatierungsstring Protokoll Datenzeilen
+#formatProtTxt   # Formatierungsstring Protokoll Titel
+#formatSilDat    # Formatierungsstring Silhouetten Datenzeilen
+#formatSilTxt    # Formatierungsstring Silhouetten Titel
+#gonInMM         # mm, die ein gon im Bildkoordinatensystem entspricht
+#hoehenwinkel    # Array fuer den Hoehenwinkel der Skyplot-Ausgabe in gon
+#maxDist         # maximale Distanz in km
+#maxX            # maximale X-Bildkoordinate in mm
+#maxY            # maximale Y-Bildkoordinate in mm
+#minDist         # minimale Distanz in km
+#minX            # minimale X-Bildkoordinate in mm
+#minY            # minimale Y-Bildkoordinate in mm
+#namBeschr       # Array fuer die Beschreibung der verfuegbaren Namendateien
+#namtC           # Array fuer die Namen-Prioritaeten der eingelesenen temporaeren Namendatei
+#namCode         # Array fuer die Namen-Prioritaeten der eingelesenen Namendatei
+#namtD           # Array fuer die Namen-Entfernungen der eingelesenen temporaeren Namendatei
+#namKuerz        # Array fuer die Kuerzel der verfuegbaren Namendateien
+#namName         # Array fuer die Namen der eingelesenen Namendatei
+#namtName        # Array fuer die Namen der eingelesenen temporaeren Namendatei
+#namPfad         # Array fuer die Ablage der verfuegbaren Namendateien
+#namX            # Array fuer die Namen-X-Koordinaten der eingelesenen Namendatei
+#namtX           # Array fuer die Namen-X-Koordinaten der eingelesenen temporaeren Namendatei
+#namY            # Array fuer die Namen-Y-Koordinaten der eingelesenen Namendatei
+#namtY           # Array fuer die Namen-Y-Koordinaten der eingelesenen temporaeren Namendatei
+#namZ            # Array fuer die Namen-Z-Koordinaten der eingelesenen Namendatei
+#namtZ           # Array fuer die Namen-Z-Koordinaten der eingelesenen temporaeren Namendatei
+#name            # Name Projektionszentrum
+#namFile         # Namendatei
+#namTmpFile      # temporaere Datei mit den darzustellenden Namen
+#oeffWink        # Oeffnungswinkel in gon
+#panoFile        # Panorama (Silhouetten)-Datei
+#panoDXFFile     # DXF-Datei mit Silhouetten-Punkten, Namen, Linien, Horizont und Rahmen
+#panoDist        # Array fuer den Distanzwert in km zu jedem Punkt im Panoramabild
+#panoDiRel       # Array fuer den relativen Distanzwert des Silhouettenpunktes
+#panoX           # Array fuer die X-Bildkoordinaten des Panoramabildes
+#panoY           # Array fuer die Y-Bildkoordinaten des Panoramabildes
+#panoLage        # Array fuer die Lagekoordinaten jedes Punktes des Panoramabildes
+#params          # Array mit diversen Parametern
+#radPr           # Radius des Projektionszylinders in mm
+#resFile         # Input-File fuer SCOP Skyplot
+#start           # Zeitstempel Beginn
+#toleranz        # Lagetoleranz bei Namen in der Einheit des Koordinatensystems
+#umfang          # Umfang (400 gon) in mm
+#version         # Applikation Version
+#x               # X-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
+#y               # Y-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
+#z               # Z-Koordinate Projektionszentrum in der Einheit des Koordinatensystems
 
 ##########################
 ########## main ##########
@@ -112,7 +111,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.15";
+  version = "2.14";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -176,10 +175,6 @@ BEGIN {
 ##### initVar #####
 # diverse Variablen initialisieren 
 function initVar() {
-
-  # Arrays mit Fixwerten fuellen
-  defDXFLayer();
-  defHimmelsrichtungen();
 
   # diverse Variablen initialisieren
   formatExtrTxt = "%7s, %7s, %4s, %-15s\n";
@@ -593,6 +588,14 @@ function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist
 # wenn parametrisiert, werden die Namen und Zuordnungslinien aus dem Namen-Ergebnisfile der Panoramaberechnung ergaenzt
 function dxfBer(    anzNam, anzPte, i, namRe) {
 
+  # verwendete DXF Layer auflisten
+  dxfLayer[0] = "BERGNAME";
+  dxfLayer[1] = "BERGNAME_99";
+  dxfLayer[2] = "HORIZONT";
+  dxfLayer[3] = "RAHMEN";
+  dxfLayer[4] = "ZUORDNUNGSLINIE";
+  dxfLayer[5] = "ZUORDNUNGSLINIE_99"; 
+
   if (namFile != "0") {
     # Namen-Ergebnisfile der Panoramaberechnung einlesen
     anzNam = namTmpEinlesen(namTmpFile);
@@ -629,18 +632,6 @@ function dxfBer(    anzNam, anzPte, i, namRe) {
         dxfAnno(panoDXFFile, namtX[i], maxY + 12, 45, sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[0]);
       }
     }
-  }
-
-  # Himmelsrichtungen eintragen
-  for (i in himmelsrichtungen) {
-    abstLiGon = himmelsrichtungen[i] - aziLi;
-    abstReGon = aziRe - himmelsrichtungen[i];
-    if (abstLiGon <= 0 || abstReGon <= 0)
-      continue;
-    abtLiMM = abstLiGon * gonInMM;
-  
-    dxfLines(panoDXFFile, abtLiMM, maxY + params["erwRahmenOben"] - 10, abtLiMM, maxY + params["erwRahmenOben"], dxfLayer[6]);
-    dxfAnno(panoDXFFile, abtLiMM + 2, maxY + params["erwRahmenOben"] - 10, 0 , i, dxfLayer[6]);
   }
 
   # Silhouettenpunkte
@@ -743,41 +734,6 @@ function username(    cmd) {
   cmd | getline user;
   close(cmd);
   return user;
-}
-
-########## Arrays initialisieren ##########
-
-##### defDXFLayer #####
-# verwendete DXF Layer definieren
-function defDXFLayer() {
-  dxfLayer[0] = "BERGNAME";
-  dxfLayer[1] = "BERGNAME_99";
-  dxfLayer[2] = "HORIZONT";
-  dxfLayer[3] = "RAHMEN";
-  dxfLayer[4] = "ZUORDNUNGSLINIE";
-  dxfLayer[5] = "ZUORDNUNGSLINIE_99"; 
-  dxfLayer[6] = "HIMMELSRICHTUNG";
-}
-
-##### defHimmelsrichtungen #####
-# gon-Azimute den Haupthimmelsrichtungen zuweisen
-function defHimmelsrichtungen() {
-  himmelsrichtungen["N"]   =   0;
-  himmelsrichtungen["NNE"] =  25;
-  himmelsrichtungen["NE"]  =  50;
-  himmelsrichtungen["ENE"] =  75;
-  himmelsrichtungen["E"]   = 100;
-  himmelsrichtungen["ESE"] = 125;
-  himmelsrichtungen["SE"]  = 150;
-  himmelsrichtungen["SSE"] = 175;
-  himmelsrichtungen["S"]   = 200;
-  himmelsrichtungen["SSW"] = 225;
-  himmelsrichtungen["SW"]  = 250;
-  himmelsrichtungen["WSW"] = 275;
-  himmelsrichtungen["W"]   = 300;
-  himmelsrichtungen["WNW"] = 325;
-  himmelsrichtungen["NW"]  = 350;
-  himmelsrichtungen["NNW"] = 375;
 }
 
 ########## DXF-Funktionen ##########

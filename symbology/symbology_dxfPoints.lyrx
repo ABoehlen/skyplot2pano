@@ -8,7 +8,7 @@
   "layerDefinitions" : [
     {
       "type" : "CIMFeatureLayer",
-      "name" : "nam_Bellevue_85-185-Point",
+      "name" : "Points",
       "uRI" : "CIMPATH=Map/Point.json",
       "sourceModifiedTime" : {
         "type" : "TimeInstant"
@@ -18,6 +18,7 @@
       "layerElevation" : {
         "type" : "CIMLayerElevationSurface"
       },
+      "expanded" : true,
       "layer3DProperties" : {
         "type" : "CIM3DLayerProperties",
         "castShadows" : true,
@@ -501,8 +502,8 @@
         ],
         "dataConnection" : {
           "type" : "CIMFeatureDatasetDataConnection",
-          "featureDataset" : "nam_Bellevue_85-185.dxf",
-          "workspaceConnectionString" : "DATABASE=.",
+          "featureDataset" : "pano_Heiligenschwendi_125-325.dxf",
+          "workspaceConnectionString" : "DATABASE=Y:\\dhm\\project\\heiligenschwendi",
           "workspaceFactory" : "Cad",
           "dataset" : "Point",
           "datasetType" : "esriDTCadDrawing"
