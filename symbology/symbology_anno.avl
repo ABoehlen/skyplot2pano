@@ -11,14 +11,15 @@
 	ClassType:	0x03
 	FieldNames:	3
 	Symbols:	4
-	Class:	38
-	Class:	39
-	Class:	40
-	Class:	41
+	Class:	46
+	Class:	47
+	Class:	48
+	Class:	49
+	Class:	50
 	StdDevs:	1.00000000000000
-	NullSym:	42
-	NullValues:	51
-	StatValues:	52
+	NullSym:	51
+	NullValues:	60
+	StatValues:	61
 	Precision:	-3
 )
 
@@ -31,6 +32,7 @@
 	Child:	13
 	Child:	21
 	Child:	29
+	Child:	37
 )
 
 (TxSym.5
@@ -170,39 +172,38 @@
 (TxSym.29
 	Color:	30
 	Font:	31
-	BgColor:	36
-	OlColor:	37
-	Size:	12.00000000000000
+	BgColor:	35
+	OlColor:	36
+	Size:	18.00000000000000
 )
 
 (TClr.30
-	Name:	"Transparent"
 )
 
 (NFont.31
 	Family:	32
 	Name:	33
 	Style:	34
-	CommonFamily:	35
-	Italic:	1
 	Weight:	1
 	Wideness:	1
 )
 
 (AVStr.32
-	S:	"Arial"
+	S:	"Segoe UI"
 )
 
 (AVStr.33
-	S:	"Arial Kursiv"
+	S:	"Segoe UI"
 )
 
 (AVStr.34
-	S:	"Kursiv"
+	S:	"Standard"
 )
 
-(AVStr.35
-	S:	"Helvetica"
+(TClr.35
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
 )
 
 (TClr.36
@@ -211,13 +212,57 @@
 	Blue:	0xff
 )
 
-(TClr.37
+(TxSym.37
+	Color:	38
+	Font:	39
+	BgColor:	44
+	OlColor:	45
+	Size:	12.00000000000000
+)
+
+(TClr.38
+	Name:	"Transparent"
+)
+
+(NFont.39
+	Family:	40
+	Name:	41
+	Style:	42
+	CommonFamily:	43
+	Italic:	1
+	Weight:	1
+	Wideness:	1
+)
+
+(AVStr.40
+	S:	"Arial"
+)
+
+(AVStr.41
+	S:	"Arial Kursiv"
+)
+
+(AVStr.42
+	S:	"Kursiv"
+)
+
+(AVStr.43
+	S:	"Helvetica"
+)
+
+(TClr.44
 	Red:	0xff
 	Green:	0xff
 	Blue:	0xff
 )
 
-(LClass.38
+(TClr.45
+	Red:	0xff
+	Green:	0xff
+	Blue:	0xff
+)
+
+(LClass.46
 	IsText:	1
 	Label:	"BERGNAME"
 	MinStr:	"BERGNAME"
@@ -225,7 +270,7 @@
 	Precision:	-3
 )
 
-(LClass.39
+(LClass.47
 	IsText:	1
 	Label:	"HORIZONT"
 	MinStr:	"HORIZONT"
@@ -233,7 +278,7 @@
 	Precision:	-3
 )
 
-(LClass.40
+(LClass.48
 	IsText:	1
 	Label:	"BERGNAME_99"
 	MinStr:	"BERGNAME_99"
@@ -241,66 +286,74 @@
 	Precision:	-3
 )
 
-(LClass.41
+(LClass.49
+	IsText:	1
+	Label:	"HIMMELSRICHTUNG"
+	MinStr:	"HIMMELSRICHTUNG"
+	MaxStr:	"HIMMELSRICHTUNG"
+	Precision:	-3
+)
+
+(LClass.50
 	IsNoData:	1
 	IsText:	1
 	Label:	"No Data"
 	Precision:	-3
 )
 
-(TxSym.42
-	Color:	43
-	Font:	44
-	BgColor:	49
-	OlColor:	50
+(TxSym.51
+	Color:	52
+	Font:	53
+	BgColor:	58
+	OlColor:	59
 	Size:	12.00000000000000
 )
 
-(TClr.43
+(TClr.52
 	Name:	"Transparent"
 )
 
-(NFont.44
-	Family:	45
-	Name:	46
-	Style:	47
-	CommonFamily:	48
+(NFont.53
+	Family:	54
+	Name:	55
+	Style:	56
+	CommonFamily:	57
 	Italic:	1
 	Weight:	1
 	Wideness:	1
 )
 
-(AVStr.45
+(AVStr.54
 	S:	"Arial"
 )
 
-(AVStr.46
+(AVStr.55
 	S:	"Arial Kursiv"
 )
 
-(AVStr.47
+(AVStr.56
 	S:	"Kursiv"
 )
 
-(AVStr.48
+(AVStr.57
 	S:	"Helvetica"
 )
 
-(TClr.49
+(TClr.58
 	Red:	0xff
 	Green:	0xff
 	Blue:	0xff
 )
 
-(TClr.50
+(TClr.59
 	Red:	0xff
 	Green:	0xff
 	Blue:	0xff
 )
 
-(NameDict.51
+(NameDict.60
 )
 
-(NameDict.52
+(NameDict.61
 )
 
