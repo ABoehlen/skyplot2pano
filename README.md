@@ -34,7 +34,7 @@ Usage: skyplot2pano.awk  <X> <Y> <Z> <Name> <DHM> <Aufloes-Azi> <Azi links> <Azi
 ```
 
 ## Usage
-The meanings of the various arguments are described in the usage (in German). For further details please take a look at the detailed documentation (also in German): https://aboehlen.github.io/dok/skyplot2pano.html
+The meanings of the various arguments are described in the usage (in German). For further details please take a look at the detailed documentation (also in German): https://aboehlen.github.io/pano/skyplot2pano.html
 
 ## Test files
 You can use the enclosed DTM file dhm1000.dtm for testing purposes. This is a version of the DHM25 digital elevation model with a 1000 m grid.
