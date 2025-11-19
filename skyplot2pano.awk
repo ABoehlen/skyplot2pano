@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         17.11.2025
-# Version:      2.16
+# Date:         19.11.2025
+# Version:      2.17
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -114,7 +114,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.16";
+  version = "2.17";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -1141,10 +1141,14 @@ function dhmListeEinlesen(dhmListe,    i) {
 ##### dhmKopieren #####
 # Hoehenmodell ins Arbeitsverzeichnis kopieren
 # ln waere schneller, funktioniert aber bei Verwendung einer RAM-Disk nicht
-function dhmKopieren(dhmTyp, dhmName,    i) {
+function dhmKopieren(dhmTyp, dhmName,    i, kopiert) {
   for (i = 1; i <= anzDhm; i++)
-    if (dhmTyp == dhmKuerz[i])
+    if (dhmTyp == dhmKuerz[i]) {
       copy(dhmPfad[i], dhmName, "angegebenes Hoehenmodell existiert nicht");
+      kopiert++;
+    }
+  if (kopiert == 0)
+    abort("\nangegebenes Hoehenmodell konnte nicht kopiert werden");
 }
 
 ##### distanzEbene #####
@@ -1298,6 +1302,18 @@ function namEinlesen(namFile,    i) {
   return i;
 }
 
+##### namKopieren #####
+# Namensfile ins Arbeitsverzeichnis kopieren
+function namKopieren(namTyp,    i, kopiert) {
+  for (i = 1; i <= anzNamFiles; i++)
+    if (namTyp == namKuerz[i] ".txt") {
+      copy(namPfad[i], ".", "angegebenes Namensfile existiert nicht");
+      kopiert++;
+    }
+  if (kopiert == 0)
+    abort("\nangegebenes Namensfile konnte nicht kopiert werden");
+}
+
 ##### namListeEinlesen #####
 # einlesen der Liste mit den verfuegbaren Namensfiles
 # nur Datenzeilen beruecksichtigen (Zeile 2 ff)
@@ -1354,14 +1370,6 @@ function namTmpEinlesen(namTmpFile,    i) {
   }
   close(namTmpFile);
   return i;
-}
-
-##### namKopieren #####
-# Namensfile ins Arbeitsverzeichnis kopieren
-function namKopieren(namTyp,    i) {
-  for (i = 1; i <= anzNamFiles; i++)
-    if (namTyp == namKuerz[i] ".txt")
-      copy(namPfad[i], ".", "angegebenes Namensfile existiert nicht");
 }
 
 ##### panoEinlesen #####
