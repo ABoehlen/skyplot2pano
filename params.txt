@@ -1,3 +1,6 @@
 Parameter            ,Wert
-erwRahmenRechts      ,50
+erwRahmenRechts      ,0
 erwRahmenOben        ,80
+txtBergnamen         ,2
+txtHimmelsri         ,4
+txtHorizont          ,3

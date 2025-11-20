@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         20.11.2025
-# Version:      2.18
+# Date:         19.11.2025
+# Version:      2.17
 #
 # Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #               - Berechnung von Sichtbarkeitskennwerten
@@ -114,7 +114,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.18";
+  version = "2.17";
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -458,7 +458,7 @@ function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelD
     skyplot("SKYPLOT.CMD", resFile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, name);
 
     # Starten von skyplot und Unterdruecken der Ausgabe
-    printf("Pano-Berechnung zu %.1f%% abgeschlossen\t%s Sek.\n", (i - minDist) * 100 / (maxDist - minDist), (systime() - start));
+    printf("Berechnung zu %.1f%% abgeschlossen\t%s Sek.\n", (i - minDist) * 100 / (maxDist - minDist), (systime() - start));
     system("skyplot < SKYPLOT.CMD > /dev/null");
 
     # numerische Ausgabe von Skyplot einlesen und Anzahl Datenzeilen speichern
@@ -597,8 +597,6 @@ function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist
 # wenn parametrisiert, werden die Namen und Zuordnungslinien aus dem Namen-Ergebnisfile der Panoramaberechnung ergaenzt
 function dxfBer(    anzNam, anzPte, i, namRe) {
 
-  print "Berechnung der DXF-Datei...";
-
   if (namFile != "0") {
     # Namen-Ergebnisfile der Panoramaberechnung einlesen
     anzNam = namTmpEinlesen(namTmpFile);
@@ -620,19 +618,19 @@ function dxfBer(    anzNam, anzPte, i, namRe) {
   dxfLines(panoDXFFile, minX, maxY + params["erwRahmenOben"], maxX, maxY + params["erwRahmenOben"], dxfLayer[3]); # horizontale Linie oben
   dxfLines(panoDXFFile, maxX, minY, minX, minY, dxfLayer[3]);                                                     # horizontale Linie unten
 
-  dxfAnno(panoDXFFile, minX + 3, 1, params["txtHorizont"], 0 , "Left", "Baseline", "Horizont", dxfLayer[2]);                          # Text "Horizont" links
-  dxfAnno(panoDXFFile, maxX - 3, 1, params["txtHorizont"], 0 , "Right", "Baseline", "Horizont", dxfLayer[2]);                         # Text "Horizont" rechts
+  dxfAnno(panoDXFFile, minX + 3, 1, 3, 0 , "Left", "Baseline", "Horizont", dxfLayer[2]);                          # Text "Horizont" links
+  dxfAnno(panoDXFFile, maxX - 3, 1, 3, 0 , "Right", "Baseline", "Horizont", dxfLayer[2]);                         # Text "Horizont" rechts
 
   if (namFile != "0") {
     # Zuordnungslinien und Bergnamen
     for (i = 1; i <= anzNam; i++) {
       if (namtC[i] == 99) {
         dxfLines(panoDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[5]);
-        dxfAnno(panoDXFFile, namtX[i], maxY + 12, params["txtBergnamen"], 45, "Left", "Baseline", sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[1]);
+        dxfAnno(panoDXFFile, namtX[i], maxY + 12, 2, 45, "Left", "Baseline", sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[1]);
       }
       else {
         dxfLines(panoDXFFile, namtX[i], namtY[i] + 0.5, namtX[i], maxY + 10, dxfLayer[4]);
-        dxfAnno(panoDXFFile, namtX[i], maxY + 12, params["txtBergnamen"], 45, "Left", "Baseline", sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[0]);
+        dxfAnno(panoDXFFile, namtX[i], maxY + 12, 2, 45, "Left", "Baseline", sprintf("%s  %d m / %.1f km", namtName[i], namtZ[i], namtD[i]/1000), dxfLayer[0]);
       }
     }
   }
@@ -646,7 +644,7 @@ function dxfBer(    anzNam, anzPte, i, namRe) {
     abtLiMM = abstLiGon * gonInMM;
   
     dxfLines(panoDXFFile, abtLiMM, maxY + params["erwRahmenOben"] - 10, abtLiMM, maxY + params["erwRahmenOben"], dxfLayer[6]);
-    dxfAnno(panoDXFFile, abtLiMM, maxY + params["erwRahmenOben"] - 12, params["txtHimmelsri"], 0 , "Center", "Top", i, dxfLayer[6]);
+    dxfAnno(panoDXFFile, abtLiMM, maxY + params["erwRahmenOben"] - 12, 4, 0 , "Center", "Top", i, dxfLayer[6]);
   }
 
   # Silhouettenpunkte
