@@ -1,0 +1,34 @@
+Version,                     Datum,      Hinweis
+skyplot2pano_v1-0.awk,       15.03.2024, Erste stabile Umsetzung
+skyplot2pano_v1-2.awk,       28.03.2024, Höchster sichtbarer Punkt ermittelt
+skyplot2pano_v1-3.awk,       30.03.2024, Höhenkoordinate jedes Punktes im sil File ergänzt
+skyplot2pano_v1-4.awk,       12.04.2024, Prüfen, ob ein gefundener Punkt bereits bei einer frueheren Berechnung ermittelt wurde
+skyplot2pano_v1-5.awk,       13.04.2025, Funktion namEinlesen zwecks Einlesen einer Namendatei
+skyplot2pano_v1-6.awk,       16.04.2024, Erste automatische Beschriftung über ein Namensfile als DXF-Datei
+skyplot2pano_v1-7.awk,       21.04.2024, Verbesserung der automatischen Beschriftung
+skyplot2pano_v1-8.awk,       27.04.2024, Zeitstempel für das Logging ergänzt
+skyplot2pano_v1-9.awk,       28.04.2024, neue Funktion bildkooX zur Bestimmung der Bildkoordinate X
+skyplot2pano_v1-10.awk,      03.05.2024, Präzisere Platzierung der Namen
+skyplot2pano_v1-11.awk,      08.05.2024, Bugfix: Azuimute kleiner als 100 gon werden koorekt verarbeiter 
+skyplot2pano_v1-12.awk,      18.05.2024, swissNAMES3D (sn10.txt) als mögliche Namensquelle ergänzt
+skyplot2pano_v1-13.awk,      09.06.2024, Bugfix: Funktion modellhoehe
+skyplot2pano_v1-14.awk,      09.08.2024, Bugfix: Berechnungsprotokoll
+skyplot2pano_v1-15.awk       20.09.2024, Ergänzungen in der DXF-Datei
+skyplot2pano_v2-0.awk,       22.12.2024, Konfigurationsfiles dhm.txt und nam.txt für Höhendaten und Namen
+skyplot2pano_v2-1.awk,       08.01.2025, Kombiniertes Feld «LageX LageY» ergänzt
+skyplot2pano_v2-2.awk,       25.04.2025, Mit Priorität 99 im Namensfile gekennzeichnete Namen werden immer dargestellt
+skyplot2pano_v2-3.awk,       27.04.2025, Verbesserte Darstellung des mathematischen Horizonts
+skyplot2pano_v2-5.awk,       01.06.2025, Hauptprozesse in Funktionen zusammenfassen
+skyplot2pano_v2-6.awk,       02.06.2025, Mit Priorität 98 im Namensfile gekennzeichnete Namen werden nie dargestellt
+skyplot2pano_v2-7.awk,       07.06.2025, Namen der Priorität 99 als separaten DXF-Layer darstellen
+skyplot2pano_v2-8.awk,       08.06.2025, globale Variablen dokumentieren
+skyplot2pano_v2-9.awk,       10.08.2025, ausgegebene Logmeldungen optimieren
+skyplot2pano_v2-10.awk,      24.08.2025, Silhouettenpunkte auch als DXF-Punkte
+skyplot2pano_v2-11.awk,      28.08.2025, DXF-Layer Definition verbessert
+skyplot2pano_v2-12.awk,      23.09.2025, Distanz in DXF-Elevation Attribut schreiben
+skyplot2pano_v2-13.awk,      10.11.2025, Konfigurationsfile params.txt für diverse Parameter
+skyplot2pano_v2-14.awk,      11.11.2025, Bugfix: DXF
+skyplot2pano_v2-15.awk,      13.11.2025, Haupthimmelsrichtungen im DXF ergänzt
+skyplot2pano_v2-16.awk,      17.11.2025, Textgrösse und -ausrichtung in DXF-Definition ergänzt
+skyplot2pano_v2-17.awk,      19.11.2025, Bugfix: dhmKopieren und namKopieren
+skyplot2pano_v2-18.awk,      20.11.2025, Textgrösse als Parameter in params.txt
