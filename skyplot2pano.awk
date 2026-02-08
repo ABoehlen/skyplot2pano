@@ -3,12 +3,14 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         20.11.2025
-# Version:      2.18
+# Date:         05.02.2026
+# Version:      3.0
 #
-# Purpose:      - Programm zur Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
-#               - Berechnung von Sichtbarkeitskennwerten
+# Purpose:      - Programm dient der Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
+#                 innerhalb eines weit gehend beliebigen Sektors bis ca. 200 gon Oeffnungswinkel (mehr ist moeglich, aber zulasten der Qualitaet).
+#               - Beschriftung der Haupthimmelsrichtungen und des mathematischen Horizonts
 #               - optionale Beschriftung der dargestellten Punkte basierend auf einer Namendatei
+#               - Berechnung von Sichtbarkeitskennwerten
 #               - Eingegebene und abgeleitete Parameter werden in ein Protokoll geschrieben
 #
 # Requirements: - das Programm verwendet UNIX-Kommandos, muss also wenn unter Windows betrieben, in einem UNIX-Emulator ausgefuehrt werden
@@ -16,7 +18,7 @@
 #               - die Parameter der verwendeten Hoehenmodelle muessen in der Datei 'dhm.txt' festgelegt werden
 #               - die Parameter der verwendeten Namensfiles muessen in der Datei 'nam.txt' festgelegt werden
 #               - diverse Parameter muessen in der Datei 'params.txt' festgelegt werden
-#               - die Pfade zu diesen beiden Textdateien sind in den Zeilen 38 und 42 festzulegen
+#               - die Pfade zu diesen Textdateien sind in der Routine 'main' festzulegen
 #               - die verwendeten Namensfiles muessen im gleich strukturierten Textformat vorliegen wie fuer die Benutzung mit SCOP.PER
 #               - das SCOP Utility Programm 'skyplot.exe' muss vorhanden und über den Befehl 'skyplot' aufrufbar sein
 #
@@ -61,6 +63,7 @@
 #himmelsrichtungen   # Array mit den gon-Azimuten der Haupt-Himmelsrichtungen
 #hoehenwinkel        # Array fuer den Hoehenwinkel der Skyplot-Ausgabe in gon
 #hTextJustification  # Array fuer die horizontale Textausrichtung im DXF
+#lines               # Array fuer das Speichern von Zeilen einer Textdatei
 #maxDist             # maximale Distanz in km
 #maxX                # maximale X-Bildkoordinate in mm
 #maxY                # maximale Y-Bildkoordinate in mm
@@ -97,6 +100,7 @@
 #resFile             # Input-File fuer SCOP Skyplot
 #start               # Zeitstempel Beginn
 #toleranz            # Lagetoleranz bei Namen in der Einheit des Koordinatensystems
+#ueberNord           # wahr, wenn zwischen Azimut links und rechts Norden liegt (0 gon), sonst falsch
 #umfang              # Umfang (400 gon) in mm
 #version             # Applikation Version
 #vTextJustification  # Array fuer die vertikale Textausrichtung im DXF
@@ -114,7 +118,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "2.18";
+  version = "3.0  "; # 5 Zeichen sind vorgesehen (nicht benoetigte mit Leerzeichen auffuellen)
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -193,8 +197,9 @@ function initVar() {
   formatProtTxt = "%-8s%-8s%-6s%-7s%-10s%-8s%-6s\n";
   formatProtDat = "%-8d%-8d%4d%7.1f%9.3f%9.1f%6d\n";
   formatNamTmp =  "%s, %d, %d, %d, %d, %d\n";
-  anzBer = 0; # Anzahl Berechnungen pro Panoramabild
-  anzPte = 0; # Anzahl Azimute pro Berechnung
+  anzBer = 0;    # Anzahl Berechnungen pro Panoramabild
+  anzPte = 0;    # Anzahl Azimute pro Berechnung
+  ueberNord = 0; # ist defaultmaessig falsch
 }
 
 ##### argEinl #####
@@ -260,14 +265,19 @@ function argPr() {
   }
 
   # Plausibilitaet der Argumente pruefen. Andernfalls Fehlermeldung ausgeben und beenden
-  if (aziLi < -400 || aziLi > 400)
-    abort("\nlinkes Azimut muss zwischen -400 und +400 gon betragen.");
+  if (aziLi < 0 || aziLi > 399)
+    abort("\nlinkes Azimut muss zwischen 0 und 399 gon betragen.");
 
-  if (aziRe < -400 || aziRe > 400)
-    abort("\nrechtes Azimut muss zwischen -400 und +400 gon betragen.");
+  if (aziRe < 0 || aziRe > 399)
+    abort("\nrechtes Azimut muss zwischen 0 und 399 gon betragen.");
 
-  if (aziLi >= aziRe)
-    abort("\nlinkes Azimut muss kleiner sein als rechtes Azimut.");
+  if (aziLi == aziRe)
+    abort("\nLinkes und rechtes Azimut duerfen nicht identisch sein.");
+
+  if (aziLi > aziRe) {
+    ueberNord = 1;
+    aziRe = aziRe + 400;
+  }
 
   if (minDist < 0)
     abort("\ndie minimale Distanz kann nicht kleiner als 0 sein.");
@@ -315,7 +325,8 @@ function datVorb() {
 
 ##### extrBer #####
 # berechnet die topographischen Extrempunkte, d.h. den noerdlichsten, oestlichsten
-# suedlichsten, westlichsten, hoechsten und entferntesten Punkt
+# suedlichsten, westlichsten, hoechsten und entferntesten Punkt, bezogen auf den
+# definierten Sektor
 function extrBer(    dist0, i, maxRec, maxSicht, N, E, S, W) {
   # Arrays zur Speicherung der Extrempunkte initialisieren
   exEntf["Distanz"] = 0;
@@ -337,12 +348,30 @@ function extrBer(    dist0, i, maxRec, maxSicht, N, E, S, W) {
   W = maxDists(x, y, (maxSicht * 2), "W");
 
   # Erstellen des SCOP-Input-Files SKYPLOT.CMD fuer die Berechnung der Extrempunkte
-  resFile = "extr.txt";
-  skyplot("SKYPLOT.CMD", resFile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, "Extrempunkte");
-  
   # Starten von skyplot und Unterdruecken der Ausgabe
-  print "Berechnung der Extrempunkte...";
-  system("skyplot < SKYPLOT.CMD > /dev/null");
+  # Liegt Norden zwischen aziLi und aziRe, muss die Berechnung in zwei Teilen durchgefuehrt und das Ergebnis kombiniert werden
+  if (ueberNord == 0) {
+    resFile = "extr.txt";
+    skyplot("SKYPLOT.CMD", resFile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, "Extrempunkte");
+    print "Berechnung der Extrempunkte...";
+    system("skyplot < SKYPLOT.CMD > /dev/null");
+  }
+  else {
+    resFile1a = "extr1a.txt";
+    resFile1b = "extr1b.txt";
+    resFile2 = "extr2.txt";
+    resFile = "extr.txt";
+    skyplot("SKYPLOT.CMD", resFile1a, x, y, z, W, S, E, N, aufloesAzi, aziLi, 400, "Extrempunkte");
+    print "Berechnung der Extrempunkte...";
+    system("skyplot < SKYPLOT.CMD > /dev/null");
+    cutTail(resFile1a, resFile1b); # weil die Zeile 400 gon identisch ist mit 0 gon des zweiten Files
+    skyplot("SKYPLOT.CMD", resFile2, x, y, z, W, S, E, N, aufloesAzi, 0, aziRe - 400, "Extrempunkte");
+    system("skyplot < SKYPLOT.CMD > /dev/null");
+    system("cat " resFile1b " " resFile2 " > " resFile);
+    system("rm -f " resFile1a);
+    system("rm -f " resFile1b);
+    system("rm -f " resFile2);
+  }
 
   # Modellhoehe ermitteln
   mhoehe = modellhoehe(resFile);
@@ -383,7 +412,6 @@ function extrBer(    dist0, i, maxRec, maxSicht, N, E, S, W) {
       abort("\nungueltiges Azimut.");
     else
       extrempunkteNESW(substr(bestimmeXY(x, y, dist0, azi[i]), 0, 10), substr(bestimmeXY(x, y, dist0, azi[i]), 11, 10), azi[i], distanz[i], hoehenwinkel[i]);
-
   }
 
   # Z Koordinate der Extrempunkte N, E, S, W bestimmen
@@ -454,12 +482,30 @@ function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelD
     W = maxDists(x, y, i, "W");
 
     # Erstellen des SCOP-Input-Files SKYPLOT.CMD
-    resFile = "sky_" name i ".txt";
-    skyplot("SKYPLOT.CMD", resFile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, name);
-
     # Starten von skyplot und Unterdruecken der Ausgabe
-    printf("Pano-Berechnung zu %.1f%% abgeschlossen\t%s Sek.\n", (i - minDist) * 100 / (maxDist - minDist), (systime() - start));
-    system("skyplot < SKYPLOT.CMD > /dev/null");
+    # Liegt Norden zwischen aziLi und aziRe, muss die Berechnung in zwei Teilen durchgefuehrt und das Ergebnis kombiniert werden
+    if (ueberNord == 0) {
+      resFile = "sky_" name i ".txt";
+      skyplot("SKYPLOT.CMD", resFile, x, y, z, W, S, E, N, aufloesAzi, aziLi, aziRe, name);
+      printf("Pano-Berechnung zu %.1f%% abgeschlossen\t%s Sek.\n", (i - minDist) * 100 / (maxDist - minDist), (systime() - start));
+      system("skyplot < SKYPLOT.CMD > /dev/null");
+    }
+    else {
+      resFile1a = "tmp1a.txt";
+      resFile1b = "tmp1b.txt";
+      resFile2 = "tmp2.txt";
+      resFile = "sky_" name i ".txt";
+      skyplot("SKYPLOT.CMD", resFile1a, x, y, z, W, S, E, N, aufloesAzi, aziLi, 400, name);
+      printf("Pano-Berechnung zu %.1f%% abgeschlossen\t%s Sek.\n", (i - minDist) * 100 / (maxDist - minDist), (systime() - start));
+      system("skyplot < SKYPLOT.CMD > /dev/null");
+      cutTail(resFile1a, resFile1b); # weil die Zeile 400 gon identisch ist mit 0 gon des zweiten Files
+      skyplot("SKYPLOT.CMD", resFile2, x, y, z, W, S, E, N, aufloesAzi, 0, aziRe - 400, name);
+      system("skyplot < SKYPLOT.CMD > /dev/null");
+      system("cat " resFile1b " " resFile2 " > " resFile);
+      system("rm -f " resFile1a);
+      system("rm -f " resFile1b);
+      system("rm -f " resFile2);
+    }
 
     # numerische Ausgabe von Skyplot einlesen und Anzahl Datenzeilen speichern
     maxRec = skyplotEinlesen(resFile);
@@ -515,7 +561,9 @@ function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelD
           if (bestimmeXY(x, y, dist0, azi[j]) == -1)
             abort("\nungueltiges Azimut.");
           xyPt["x"] = substr(bestimmeXY(x, y, dist0, azi[j]), 0, 10);
+          xyPt["x"] = xyPt["x"] + 0;
           xyPt["y"] = substr(bestimmeXY(x, y, dist0, azi[j]), 11, 10);
+          xyPt["y"] = xyPt["y"] + 0;
             
           # Bestimmen der Hoehe jedes Punktes
           xyPt["z"] = hoeheAusDistanzUndWinkel(z, distanz[j], hoehenwinkel[j]);
@@ -556,9 +604,10 @@ function panoBer(    abstX, abstY, anzNam, dist0, distDHMrand, distRel, distRelD
 # berechnet die Namen im Panoramabild
 # pruefen, welche Namen in der Naehe der ins Panoramafile geschriebenen Punkte liegen...
 # ...und diese in eine temporaere Textdatei schreiben. Dabei wird geprueft, ob der Name bereits vorhanden ist
+# liegt Norden zwischen aziLi und aziRe, muss die Berechnung in zwei Teilen durchgefuehrt werden
 # mit Namenscode 98 gekennzeichnete Namen werden nicht dargestellt
 # mit Namenscode 99 gekennzeichnete Namen werden in jedem Fall dargestellt
-function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist, nameHoehe) {
+function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist, nameHoehe, tmpAzi) {
   existiertNam = 0;
   for (nam = 1; nam <= anzNam; nam++) {
     # innerhalb der definierten Lagetoleranz nach uebereinstimmenden Namenkoordinaten oder Namenscode 99 suchen
@@ -572,16 +621,40 @@ function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist
         # Distanz zu jedem Namenspunkt berechnen
         # Pruefen, dass Name innerhalb des definierten Sektors liegt
         if (existiertNam == 0) {
-          if (azimut(x, y, namX[nam], namY[nam]) > aziLi && azimut(x, y, namX[nam], namY[nam]) < aziRe) {
-            namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM);
-            namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
-            namDist = distanzEbene(x, y, namX[nam], namY[nam]);
-            printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY, namCode[nam]) >> namTmpFile;
-            bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
-
-            # minimale Bildkoordinate aktualisieren
-            if (namAbstY < minY)
-              minY = namAbstY;
+          tmpAzi = azimut(x, y, namX[nam], namY[nam]);
+          if (ueberNord == 1) {
+            if (tmpAzi > aziLi && tmpAzi < 400) {
+              namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM, 0);
+              namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
+              namDist = distanzEbene(x, y, namX[nam], namY[nam]);
+              printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY, namCode[nam]) >> namTmpFile;
+              bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
+              # minimale Bildkoordinate aktualisieren
+              if (namAbstY < minY)
+                minY = namAbstY;
+            }
+            else if (tmpAzi >= 0 && tmpAzi < aziRe) {
+              namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM, 1);
+              namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
+              namDist = distanzEbene(x, y, namX[nam], namY[nam]);
+              printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY, namCode[nam]) >> namTmpFile;
+              bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
+              # minimale Bildkoordinate aktualisieren
+              if (namAbstY < minY)
+                minY = namAbstY;
+            }
+          }
+          else {
+            if (tmpAzi > aziLi && tmpAzi < aziRe) {
+              namAbstX = bildkooX(x, y, namX[nam], namY[nam], aziLi, gonInMM, ueberNord);
+              namAbstY = bildkooY(x, y, z, namX[nam], namY[nam], namZ[nam], radPr);
+              namDist = distanzEbene(x, y, namX[nam], namY[nam]);
+              printf(formatNamTmp, namName[nam], namZ[nam], namDist, namAbstX, namAbstY, namCode[nam]) >> namTmpFile;
+              bisherigeNamen[m + 1] = nameHoehe; # aktueller Name ins Array eintragen
+              # minimale Bildkoordinate aktualisieren
+              if (namAbstY < minY)
+                minY = namAbstY;
+            }
           }
         }
         else
@@ -595,7 +668,7 @@ function panoNamBer(anzNam,    existiertNam, m, nam, namAbstX, namAbstY, namDist
 ##### dxfBer #####
 # berechnet das DXF-File mit Silhouettenpunkten, Rahmen und Zusatzinformationen
 # wenn parametrisiert, werden die Namen und Zuordnungslinien aus dem Namen-Ergebnisfile der Panoramaberechnung ergaenzt
-function dxfBer(    anzNam, anzPte, i, namRe) {
+function dxfBer(    abstLiGon, abstReGon, abstLiMM, anzNam, anzPte, i, namRe) {
 
   print "Berechnung der DXF-Datei...";
 
@@ -609,7 +682,7 @@ function dxfBer(    anzNam, anzPte, i, namRe) {
 
   # DXF aufbauen
   dxfHeader(panoDXFFile, minX, minY, maxX, maxY + params["erwRahmenOben"]);
-  dxfTables(panoDXFFile, dxfLayer);
+  dxfTables(panoDXFFile);
 
   # Rahmen um den festgelegten Wert nach oben erweitern und Horizont hinzufuegen
   dxfLines(panoDXFFile, minX, 0, 20, 0, dxfLayer[2]);                                                             # Horizontlinie links
@@ -620,8 +693,8 @@ function dxfBer(    anzNam, anzPte, i, namRe) {
   dxfLines(panoDXFFile, minX, maxY + params["erwRahmenOben"], maxX, maxY + params["erwRahmenOben"], dxfLayer[3]); # horizontale Linie oben
   dxfLines(panoDXFFile, maxX, minY, minX, minY, dxfLayer[3]);                                                     # horizontale Linie unten
 
-  dxfAnno(panoDXFFile, minX + 3, 1, params["txtHorizont"], 0 , "Left", "Baseline", "Horizont", dxfLayer[2]);                          # Text "Horizont" links
-  dxfAnno(panoDXFFile, maxX - 3, 1, params["txtHorizont"], 0 , "Right", "Baseline", "Horizont", dxfLayer[2]);                         # Text "Horizont" rechts
+  dxfAnno(panoDXFFile, minX + 3, 1, params["txtHorizont"], 0 , "Left", "Baseline", "Horizont", dxfLayer[2]);      # Text "Horizont" links
+  dxfAnno(panoDXFFile, maxX - 3, 1, params["txtHorizont"], 0 , "Right", "Baseline", "Horizont", dxfLayer[2]);     # Text "Horizont" rechts
 
   if (namFile != "0") {
     # Zuordnungslinien und Bergnamen
@@ -639,14 +712,28 @@ function dxfBer(    anzNam, anzPte, i, namRe) {
 
   # Himmelsrichtungen eintragen
   for (i in himmelsrichtungen) {
-    abstLiGon = himmelsrichtungen[i] - aziLi;
-    abstReGon = aziRe - himmelsrichtungen[i];
-    if (abstLiGon <= 0 || abstReGon <= 0)
-      continue;
-    abtLiMM = abstLiGon * gonInMM;
-  
-    dxfLines(panoDXFFile, abtLiMM, maxY + params["erwRahmenOben"] - 10, abtLiMM, maxY + params["erwRahmenOben"], dxfLayer[6]);
-    dxfAnno(panoDXFFile, abtLiMM, maxY + params["erwRahmenOben"] - 12, params["txtHimmelsri"], 0 , "Center", "Top", i, dxfLayer[6]);
+    if (ueberNord == 1) {
+      if (himmelsrichtungen[i] < (aziRe - 400)) {
+        abstLiGon = (himmelsrichtungen[i] + 400) - aziLi;
+        abstLiMM = abstLiGon * gonInMM;
+        dxfLines(panoDXFFile, abstLiMM, maxY + params["erwRahmenOben"] - 10, abstLiMM, maxY + params["erwRahmenOben"], dxfLayer[6]);
+        dxfAnno(panoDXFFile, abstLiMM, maxY + params["erwRahmenOben"] - 12, params["txtHimmelsri"], 0 , "Center", "Top", i, dxfLayer[6]);
+      }
+      else if (himmelsrichtungen[i] > aziLi) {
+        abstLiGon = himmelsrichtungen[i] - aziLi;
+        abstLiMM = abstLiGon * gonInMM;
+        dxfLines(panoDXFFile, abstLiMM, maxY + params["erwRahmenOben"] - 10, abstLiMM, maxY + params["erwRahmenOben"], dxfLayer[6]);
+        dxfAnno(panoDXFFile, abstLiMM, maxY + params["erwRahmenOben"] - 12, params["txtHimmelsri"], 0 , "Center", "Top", i, dxfLayer[6]);
+      }
+    }
+    else {
+      if (himmelsrichtungen[i] > aziLi && himmelsrichtungen[i] < aziRe) {
+        abstLiGon = himmelsrichtungen[i] - aziLi;
+        abstLiMM = abstLiGon * gonInMM;
+        dxfLines(panoDXFFile, abstLiMM, maxY + params["erwRahmenOben"] - 10, abstLiMM, maxY + params["erwRahmenOben"], dxfLayer[6]);
+        dxfAnno(panoDXFFile, abstLiMM, maxY + params["erwRahmenOben"] - 12, params["txtHimmelsri"], 0 , "Center", "Top", i, dxfLayer[6]);
+      }
+    }
   }
 
   # Silhouettenpunkte
@@ -722,6 +809,19 @@ function copy(source, target, errorMsg,    exitStatus) {
     abort("\n" errorMsg);
 }
 
+##### cutTail #####
+# loescht die letzte Zeile des Input-Files und schreibt das Ergebnis als Output-File
+function cutTail(inp, outp,    i) {
+  while ((getline < inp) > 0) {
+    i++;
+    lines[i] = $0;
+  }
+  for (i = 1; i <= length(lines) - 1; i++)
+    print lines[i] > outp;
+  close(inp);
+  close(outp);
+}
+
 ##### new #####
 # erzeugt ein neues, leeres Array oder loescht den Inhalt eines bestehenden
 function new(array) {
@@ -754,7 +854,7 @@ function username(    cmd) {
 ########## Arrays initialisieren ##########
 
 ##### defHimmelsrichtungen #####
-# gon-Azimute den Haupthimmelsrichtungen zuweisen
+# gon-Azimute den Abkuerzungen der Haupthimmelsrichtungen zuweisen
 function defHimmelsrichtungen() {
   himmelsrichtungen["N"]   =   0;
   himmelsrichtungen["NNE"] =  25;
@@ -788,6 +888,7 @@ function defDXFLayer() {
 
 ##### defHTextJustification #####
 # horizontale Textausrichtung fuer die Funktion dxfAnno
+# Zuweisung der DXF-Codes zu den Bezeichnungen
 function defHTextJustification() {
   hTextJustification["Left"]   = 0;
   hTextJustification["Center"] = 1;
@@ -796,6 +897,7 @@ function defHTextJustification() {
 
 ##### defVTextJustification #####
 # vertikale Textausrichtung fuer die Funktion dxfAnno
+# Zuweisung der DXF-Codes zu den Bezeichnungen
 function defVTextJustification() {
   vTextJustification["Baseline"] = 0;
   vTextJustification["Bottom"]   = 1;
@@ -839,7 +941,7 @@ function dxfHeader(dxfFile, minX, minY, maxX, maxY) {
 
 ##### dxfTables #####
 # erzeugt die Tables Section der DXF-Datei
-function dxfTables(dxfFile, dxfLayer,    i) {
+function dxfTables(dxfFile,    i) {
   printf("  0\n")                >> dxfFile;
   printf("SECTION\n")            >> dxfFile;
   printf("  2\n")                >> dxfFile;
@@ -910,7 +1012,7 @@ function dxfPoints(dxfFile, x, y, layer, color, elevation) {
 }
 
 ##### dxfLines #####
-# erzeugt die Linien der DXF-Datei
+# erzeugt durch zwei Koordinatenpaare definierte Linien der DXF-Datei.
 function dxfLines(dxfFile, x1, y1, x2, y2, layer) {
   printf("  0\n")                  >> dxfFile;
   printf("POLYLINE\n")             >> dxfFile;
@@ -1018,29 +1120,29 @@ function azimut(xA, yA, xB, yB,    azi) {
 # Zurueckgeliefert werden X und Y Koordinaten als Leerzeichen-getrennter String.
 # bei einem ungueltigen Azimut (< 0 oder > 400) wird -1 zurueckgegeben
 function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
-  if (aziGon == 0)
-    return sprintf("%10d%10d", x, y + dist);
+  if (aziGon == 0 || aziGon == 400)
+    return sprintf("%-10d%-10d", x, y + dist);
   else if (aziGon > 0 && aziGon < 50) {
     a = gegenkathAusHypothUndAlpha(dist, aziGon);
     xE = x + a;
     yE = y + ankathAusGegenkathUndAlpha(a, aziGon);
-    return sprintf("%10d%10d", round(xE), round(yE));
+    return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon >= 50 && aziGon < 100) {
     beta = 100 - aziGon;
     b = gegenkathAusHypothUndAlpha(dist, beta);
     xE = x + ankathAusGegenkathUndAlpha(b, beta);
     yE = y + b;
-    return sprintf("%10d%10d", round(xE), round(yE));
+    return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon == 100)
-    return sprintf("%10d%10d", x + dist, y);
+    return sprintf("%-10d%-10d", x + dist, y);
   else if (aziGon > 100 && aziGon < 150) {
     alpha = aziGon - 100;
     a = gegenkathAusHypothUndAlpha(dist, alpha);
     xE = x + ankathAusGegenkathUndAlpha(a, alpha);
     yE = y - a;
-    return sprintf("%10d%10d", round(xE), round(yE));
+    return sprintf("%-10d%-10d", round(xE), round(yE));
    }
   else if (aziGon >= 150 && aziGon < 200) {
     beta = 200 - aziGon;
@@ -1050,7 +1152,7 @@ function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
     return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon == 200)
-    return sprintf("%10d%10d", x, y - dist);
+    return sprintf("%-10d%-10d", x, y - dist);
   else if (aziGon > 200 && aziGon < 250) {
     alpha = aziGon - 200;
     a = gegenkathAusHypothUndAlpha(dist, alpha);
@@ -1066,7 +1168,7 @@ function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
     return sprintf("%-10d%-10d", round(xE), round(yE));
   }
   else if (aziGon == 300)
-    return sprintf("%10d%10d", x - dist, y);
+    return sprintf("%-10d%-10d", x - dist, y);
   else if (aziGon > 300 && aziGon < 350) {
     alpha = aziGon - 300;
     a = gegenkathAusHypothUndAlpha(dist, alpha);
@@ -1088,9 +1190,14 @@ function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
 ##### bildkooX #####
 # ermittelt die Bildkoordinate X ausgehend von der aeusseren und inneren
 # Orientierung des Projektionszentrums
-function bildkooX(xP, yP, xE, yE, aziLi, gonInMM,    azi) {
+# bei einer Berechnung ueber Azimut 0 (Nord) hinweg, ist uebN fuer den Teil
+# rechts von Nord auf 1 zu setzen, ansonsten 0
+function bildkooX(xP, yP, xE, yE, aziLi, gonInMM, uebN,    azi) {
   azi = azimut(xP, yP, xE, yE);
-  return (azi - aziLi) * gonInMM;
+  if (uebN == 1)
+    return ((azi + 400) - aziLi) * gonInMM;
+  else
+    return (azi - aziLi) * gonInMM;
 }
 
 ##### bildkooY #####
@@ -1435,7 +1542,7 @@ function printTitel(vers, dat,    tit) {
   tit = "\n\
         ***************************************************\n\
         *                                                 *\n\
-        *            skyplot2pano, Version " vers "           *\n\
+        *            skyplot2pano, Version " vers "          *\n\
         *    https://github.com/ABoehlen/skyplot2pano     *\n\
         *                                                 *\n\
         *                   " dat "                    *\n\
@@ -1459,7 +1566,10 @@ function prot(protFile, vers, berD) {
   printf("Standort (X / Y / Z)                :  %d / %d / %d\n", x, y, z)                       > protFile;
   printf("Name                                :  %s\n", name)                                    > protFile;
   printf("Azimut links                        :  %d gon\n", aziLi)                               > protFile;
-  printf("Azimut rechts                       :  %d gon\n", aziRe)                               > protFile;
+  if (ueberNord == 0)
+    printf("Azimut rechts                       :  %d gon\n", aziRe)                             > protFile;
+  else
+    printf("Azimut rechts                       :  %d gon\n", aziRe - 400)                       > protFile;
   printf("Azimutale Aufloesung                :  %.3f gon\n", aufloesAzi)                        > protFile;
   printf("Bildbreite                          :  %d mm\n", bildbr)                               > protFile;
   printf("Verwendetes Hoehenmodell            :  %s\n", dhmBeschreibung(dhm))                    > protFile;

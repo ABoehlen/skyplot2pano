@@ -32,3 +32,4 @@ skyplot2pano_v2-15.awk,      13.11.2025, Haupthimmelsrichtungen im DXF ergänzt
 skyplot2pano_v2-16.awk,      17.11.2025, Textgrösse und -ausrichtung in DXF-Definition ergänzt
 skyplot2pano_v2-17.awk,      19.11.2025, Bugfix: dhmKopieren und namKopieren
 skyplot2pano_v2-18.awk,      20.11.2025, Textgrösse als Parameter in params.txt
+skyplot2pano_v3-00.awk,      06.02.2026, Sektoren über Azimut 0 (Nord) sind auch möglich
