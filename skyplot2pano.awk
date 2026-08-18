@@ -3,8 +3,8 @@
 #
 # Filename:     skyplot2pano.awk
 # Author:       Adrian Boehlen
-# Date:         05.02.2026
-# Version:      3.0
+# Date:         18.08.2026
+# Version:      3.1
 #
 # Purpose:      - Programm dient der Erzeugung eines Panoramas mit aus Punkten gebildeten, nach Distanz abgestuften "Silhouettenlinien"
 #                 innerhalb eines weit gehend beliebigen Sektors bis ca. 200 gon Oeffnungswinkel (mehr ist moeglich, aber zulasten der Qualitaet).
@@ -118,7 +118,7 @@ BEGIN {
   start = systime();
   
   # Versionsnummer
-  version = "3.0  "; # 5 Zeichen sind vorgesehen (nicht benoetigte mit Leerzeichen auffuellen)
+  version = "3.1  "; # 5 Zeichen sind vorgesehen (nicht benoetigte mit Leerzeichen auffuellen)
 
   # Field Separator auf "," stellen, zwecks Einlesen der Konfigurationsdateien und der temporaer erzeugten Namensfiles
   FS = ",";
@@ -780,11 +780,19 @@ function abschlBer(    berD, protokoll) {
     exit;
 }
 
-
+###########################################
 ########## allgemeine Funktionen ##########
+###########################################
 
 ##### abort #####
 # Fehlermeldung ausgeben und Programm beenden
+#
+# Parameter:
+#  Fehlermeldung (String)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function abort(info) {
   print info;
   print "Programm wird beendet.\n";
@@ -793,6 +801,13 @@ function abort(info) {
 
 ##### convertsecs #####
 # rechnet Sekunden in formatierte Ausgabe Std. Min. und Sek. um
+#
+# Parameter:
+#  Sekunden (Integer)
+# Rueckgabewert:
+#  Stunden/Minuten/Sekunden (String)
+# aendert:
+#  nichts
 function convertsecs(sec,    h, m, s) {
   h = sec / 3600;
   m = (sec % 3600) / 60;
@@ -803,6 +818,15 @@ function convertsecs(sec,    h, m, s) {
 ##### copy #####
 # kopiert Datei von 'source' nach 'target' mittels UNIX-Kommando cp
 # beendet das Programm, wenn der Kopiervorgang scheitert
+#
+# Parameter:
+#  Quelle (String)
+#  Ziel (String)
+#  Fehlermeldung (String)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function copy(source, target, errorMsg,    exitStatus) {
   exitStatus = system("cp " source " " target);
   if (exitStatus != 0)
@@ -811,6 +835,14 @@ function copy(source, target, errorMsg,    exitStatus) {
 
 ##### cutTail #####
 # loescht die letzte Zeile des Input-Files und schreibt das Ergebnis als Output-File
+#
+# Parameter:
+#  Eingabedatei (File)
+#  Ausgabedatei (File)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function cutTail(inp, outp,    i) {
   while ((getline < inp) > 0) {
     i++;
@@ -824,12 +856,27 @@ function cutTail(inp, outp,    i) {
 
 ##### new #####
 # erzeugt ein neues, leeres Array oder loescht den Inhalt eines bestehenden
+#
+# Parameter:
+#  Array
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  angegebenes Array, sofern schon vorhanden
 function new(array) {
   split("", array);
 }
 
 ##### rep #####
 # erzeugt n Zeichen vom Typ 's' und liefert sie zurueck
+#
+# Parameter:
+#  Anzahl Zeichen (Integer)
+#  Zeichen (String, nur ein Zeichen)
+# Rueckgabewert:
+#  zusammengesetzte Zeichenkette
+# aendert:
+#  nichts
 function rep(n, s,    t) {
   while (n-- > 0)
     t = t s;
@@ -838,12 +885,26 @@ function rep(n, s,    t) {
 
 ##### round #####
 # rundet angegebene Fliesskommazahl auf die naechste Ganzzahl
+#
+# Parameter:
+#  Fliesskommazahl
+# Rueckgabewert:
+#  gerundete Ganzzahl
+# aendert:
+#  nichts
 function round(float) {
   return int(float + 0.5);
 }
 
 ##### username #####
 # ermittelt mit UNIX-Kommando den Usernamen und gibt ihn zurueck
+#
+# Parameter:
+#  keine
+# Rueckgabewert:
+#  Benutzername (String)
+# aendert:
+#  nichts
 function username(    cmd) {
   cmd = "whoami";
   cmd | getline user;
@@ -855,6 +916,13 @@ function username(    cmd) {
 
 ##### defHimmelsrichtungen #####
 # gon-Azimute den Abkuerzungen der Haupthimmelsrichtungen zuweisen
+#
+# Parameter:
+#  keine
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  himmelsrichtungen (Array)
 function defHimmelsrichtungen() {
   himmelsrichtungen["N"]   =   0;
   himmelsrichtungen["NNE"] =  25;
@@ -876,6 +944,13 @@ function defHimmelsrichtungen() {
 
 ##### defDXFLayer #####
 # verwendete DXF Layer definieren
+#
+# Parameter:
+#  keine
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  dxfLayer (Array)
 function defDXFLayer() {
   dxfLayer[0] = "BERGNAME";
   dxfLayer[1] = "BERGNAME_99";
@@ -889,6 +964,13 @@ function defDXFLayer() {
 ##### defHTextJustification #####
 # horizontale Textausrichtung fuer die Funktion dxfAnno
 # Zuweisung der DXF-Codes zu den Bezeichnungen
+#
+# Parameter:
+#  keine
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  hTextJustification (Array)
 function defHTextJustification() {
   hTextJustification["Left"]   = 0;
   hTextJustification["Center"] = 1;
@@ -898,6 +980,13 @@ function defHTextJustification() {
 ##### defVTextJustification #####
 # vertikale Textausrichtung fuer die Funktion dxfAnno
 # Zuweisung der DXF-Codes zu den Bezeichnungen
+#
+# Parameter:
+#  keine
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  vTextJustification (Array)
 function defVTextJustification() {
   vTextJustification["Baseline"] = 0;
   vTextJustification["Bottom"]   = 1;
@@ -909,6 +998,17 @@ function defVTextJustification() {
 
 ##### dxfHeader #####
 # erzeugt die Header Section der DXF-Datei
+#
+# Parameter:
+#  DXF-Datei (File)
+#  minimale X-Koordinate (Float)
+#  minimale Y-Koordinate (Float)
+#  maximale X-Koordinate (Float)
+#  maximale Y-Koordinate (Float)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  DXF-Datei (File)
 function dxfHeader(dxfFile, minX, minY, maxX, maxY) {
   printf("  0\n")             > dxfFile;
   printf("SECTION\n")         > dxfFile;
@@ -941,6 +1041,13 @@ function dxfHeader(dxfFile, minX, minY, maxX, maxY) {
 
 ##### dxfTables #####
 # erzeugt die Tables Section der DXF-Datei
+#
+# Parameter:
+#  DXF-Datei (File)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  DXF-Datei (File)
 function dxfTables(dxfFile,    i) {
   printf("  0\n")                >> dxfFile;
   printf("SECTION\n")            >> dxfFile;
@@ -993,6 +1100,18 @@ function dxfTables(dxfFile,    i) {
 
 ##### dxfPoints #####
 # erzeugt die Punkte der DXF-Datei
+#
+# Parameter:
+#  DXF-Datei (File)
+#  X-Koordinate (Float)
+#  Y-Koordinate (Float)
+#  DXF-Layer (String)
+#  DXF-Color (Float)
+#  DXF-Elevation (Float)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  DXF-Datei (File)
 function dxfPoints(dxfFile, x, y, layer, color, elevation) {
   printf("  0\n")                    >> dxfFile;
   printf("POINT\n")                  >> dxfFile;
@@ -1012,7 +1131,19 @@ function dxfPoints(dxfFile, x, y, layer, color, elevation) {
 }
 
 ##### dxfLines #####
-# erzeugt durch zwei Koordinatenpaare definierte Linien der DXF-Datei.
+# erzeugt durch zwei Koordinatenpaare definierte Linien der DXF-Datei
+#
+# Parameter:
+#  DXF-Datei (File)
+#  erste X-Koordinate (Float)
+#  erste Y-Koordinate (Float)
+#  zweite X-Koordinate (Float)
+#  zweite Y-Koordinate (Float)
+#  DXF-Layer (String)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  DXF-Datei (File)
 function dxfLines(dxfFile, x1, y1, x2, y2, layer) {
   printf("  0\n")                  >> dxfFile;
   printf("POLYLINE\n")             >> dxfFile;
@@ -1061,6 +1192,21 @@ function dxfLines(dxfFile, x1, y1, x2, y2, layer) {
 
 ##### dxfAnno #####
 # erzeugt die Annotations (Schriften) der DXF-Datei
+#
+# Parameter:
+#  DXF-Datei (File)
+#  X-Koordinate (Float)
+#  Y-Koordinate (Float)
+#  Textgroesse (Float)
+#  Textwinkel (Float)
+#  Code fuer horizontale Textausrichtung (Integer)
+#  Code fuer vertikale Textausrichtung (Integer)
+#  Auszugebender Text (String)
+#  DXF-Layer (String)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  DXF-Datei (File)
 function dxfAnno(dxfFile, x, y, size, angle, hj, vj, text, layer) {
   printf("  0\n")                        >> dxfFile;
   printf("TEXT\n")                       >> dxfFile;
@@ -1093,6 +1239,13 @@ function dxfAnno(dxfFile, x, y, size, angle, hj, vj, text, layer) {
 
 ##### dxfEnd #####
 # beendet den Aufbau der DXF-Datei
+#
+# Parameter:
+#  DXF-Datei (File)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  DXF-Datei (File)
 function dxfEnd(dxfFile) {
   printf("  0\n")             >> dxfFile;
   printf("ENDSEC\n")          >> dxfFile;
@@ -1105,6 +1258,16 @@ function dxfEnd(dxfFile) {
 
 ##### azimut #####
 # Berechnet das Azimut von xB/yB von xA/yA in gon
+#
+# Parameter:
+#  erste X-Koordinate (Float)
+#  erste Y-Koordinate (Float)
+#  zweite X-Koordinate (Float)
+#  zweite Y-Koordinate (Float)
+# Rueckgabewert:
+#  Azimut in gon (Float)
+# aendert:
+#  nichts
 function azimut(xA, yA, xB, yB,    azi) {
   azi = atan2(xB - xA, yB - yA);
   if (azi >= 0)
@@ -1119,6 +1282,16 @@ function azimut(xA, yA, xB, yB,    azi) {
 # Die Distanz bildet die Hypotenuse (c), das Azimut wird in den Winkel Alpha oder Beta umgerechnet.
 # Zurueckgeliefert werden X und Y Koordinaten als Leerzeichen-getrennter String.
 # bei einem ungueltigen Azimut (< 0 oder > 400) wird -1 zurueckgegeben
+#
+# Parameter:
+#  DXF-Datei (File)
+#  X-Koordinate (Float)
+#  Y-Koordinate (Float)
+#  Azimut in gon (Float)
+# Rueckgabewert:
+#  kombinierte X/Y-Koordinaten (String)
+# aendert:
+#  nichts
 function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
   if (aziGon == 0 || aziGon == 400)
     return sprintf("%-10d%-10d", x, y + dist);
@@ -1192,6 +1365,19 @@ function bestimmeXY(x, y, dist, aziGon,    a, b, alpha, beta, xE, yE) {
 # Orientierung des Projektionszentrums
 # bei einer Berechnung ueber Azimut 0 (Nord) hinweg, ist uebN fuer den Teil
 # rechts von Nord auf 1 zu setzen, ansonsten 0
+#
+# Parameter:
+#  X-Koordinate PZ (Float)
+#  Y-Koordinate PZ (Float)
+#  X-Koordinate anvisierter Punkt(Float)
+#  Y-Koordinate anvisierter Punkt (Float)
+#  Azimut links (Float)
+#  gonInMM (globale Variable, Float)
+#  Norden im Bild (Boolean)
+# Rueckgabewert:
+#  Bildkoordinate X (Float)
+# aendert:
+#  nichts
 function bildkooX(xP, yP, xE, yE, aziLi, gonInMM, uebN,    azi) {
   azi = azimut(xP, yP, xE, yE);
   if (uebN == 1)
@@ -1203,6 +1389,19 @@ function bildkooX(xP, yP, xE, yE, aziLi, gonInMM, uebN,    azi) {
 ##### bildkooY #####
 # ermittelt die Bildkoordinate Y ausgehend von der aeusseren und inneren
 # Orientierung des Projektionszentrums
+#
+# Parameter:
+#  X-Koordinate PZ (Float)
+#  Y-Koordinate PZ (Float)
+#  Z-Koordinate PZ (Float)
+#  X-Koordinate anvisierter Punkt (Float)
+#  Y-Koordinate anvisierter Punkt (Float)
+#  Z-Koordinate anvisierter Punkt (Float)
+#  Projektionszylinderradius (Float)
+# Rueckgabewert:
+#  Bildkoordinate Y (Float)
+# aendert:
+#  nichts
 function bildkooY(xP, yP, zP, xE, yE, zE, radPr,    entf, entfEbene, hDiff, hdiffEkrref, hWink) {
   hDiff = zE - zP;
   entfEbene = distanzEbene(xP, yP, xE, yE);
@@ -1214,6 +1413,13 @@ function bildkooY(xP, yP, zP, xE, yE, zE, radPr,    entf, entfEbene, hDiff, hdif
 
 ##### dhmBeschreibung #####
 # Ausgeben des genauen Namens des angegebenen Hoehenmodells
+#
+# Parameter:
+#  DHM-Typ (String)
+# Rueckgabewert:
+#  zugehoerige Beschreibung (String)
+# aendert:
+#  nichts
 function dhmBeschreibung(dhmTyp,    i) {
   for (i = 1; i <= anzDhm; i++)
     if (dhmTyp == dhmKuerz[i])
@@ -1225,6 +1431,15 @@ function dhmBeschreibung(dhmTyp,    i) {
 # nur Datenzeilen beruecksichtigen (Zeile 2 ff)
 # aus den 3 Feldern die Arrays 'dhmKuerz', 'dhmPfad' und 'dhmBeschr' bilden
 # Anzahl Datenzeilen zurueckliefern
+#
+# Parameter:
+#  Liste der DHM (File)
+# Rueckgabewert:
+#  Anzahl Datenzeilen (Integer)
+# aendert:
+#  dhmKuerz (Array)
+#  dhmPfad (Array)
+#  dhmBeschr (Array)
 function dhmListeEinlesen(dhmListe,    i) {
   new(dhmKuerz);
   new(dhmPfad);
@@ -1250,6 +1465,14 @@ function dhmListeEinlesen(dhmListe,    i) {
 ##### dhmKopieren #####
 # Hoehenmodell ins Arbeitsverzeichnis kopieren
 # ln waere schneller, funktioniert aber bei Verwendung einer RAM-Disk nicht
+#
+# Parameter:
+#  DHM-Typ (String)
+#  DHM-Name (File)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function dhmKopieren(dhmTyp, dhmName,    i, kopiert) {
   for (i = 1; i <= anzDhm; i++)
     if (dhmTyp == dhmKuerz[i]) {
@@ -1262,6 +1485,16 @@ function dhmKopieren(dhmTyp, dhmName,    i, kopiert) {
 
 ##### distanzEbene #####
 # Berechnet die Distanz in der Ebene zwischen xA/yA und xB/yB in den Einheiten des Koordinatensystems
+#
+# Parameter:
+#  erste X-Koordinate (Float)
+#  erste Y-Koordinate (Float)
+#  zweite X-Koordinate (Float)
+#  zweite Y-Koordinate (Float)
+# Rueckgabewert:
+#  Distanz (Float)
+# aendert:
+#  nichts
 function distanzEbene(xA, yA, xB, yB) {
   return sqrt((xA - xB) ^ 2 + (yA - yB) ^ 2);
 }
@@ -1272,6 +1505,14 @@ function distanzEbene(xA, yA, xB, yB) {
 # die Ankathete entspricht der Haelfte der Mittelsenkrechten, das Azimut dem Winkel Alpha, jeweils
 # umgerechnet auf einen Wert zwischen 0 und 50 gon
 # bei einem ungueltigen Azimut (< 0 oder > 400) wird -1 zurueckgegeben
+#
+# Parameter:
+#  Haelfte Mittelsenkrechte (Integer)
+#  Azimut in gon (Float)
+# Rueckgabewert:
+#  Distanz zum Rand im entsprechenden Azimut (Float)
+# aendert:
+#  nichts
 function distGre(haelfteMittelsenkr, aziGon) {
   if (aziGon >=0 && aziGon < 50)
     return hypothAusAnkathUndAlpha(haelfteMittelsenkr, aziGon);
@@ -1298,6 +1539,13 @@ function distGre(haelfteMittelsenkr, aziGon) {
 # dist ist die Distanz in Metern
 # (1 - k): setzt sich zusammen aus 1 minus mittlerer Refraktionskoeffizient (~0.13)
 # erdR ist der Erdradius, der mit 6370000  m festgelegt wird (gleicher Wert wie SCOP.SKYPLOT)
+#
+# Parameter:
+#  Distanz (Float)
+# Rueckgabewert:
+#  Absenkung durch Erdkruemmung und Refraktion (Float)
+# aendert:
+#  nichts
 function ekrref(dist,    k, erdR) {
   k = 0.13;
   erdR = 6370000;
@@ -1307,6 +1555,20 @@ function ekrref(dist,    k, erdR) {
 ##### extrempunkteNESW #####
 # bestimmt die Extrempunkte Nord, Ost, Sued und West ausgehend vom aktuell prozessierten Punkt
 # und uebertraegt zusaetzliche Informationen
+#
+# Parameter:
+#  X-Koordinate (Float)
+#  Y-Koordinate (Float)
+#  Azimut (Float)
+#  Distanz (Float)
+#  Hoehenwinkel in gon (Float)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  exNord (Array)
+#  exOst (Array)
+#  exSued (Array)
+#  exWest (Array)
 function extrempunkteNESW(xAkt, yAkt, azi, dist, hWink) {
   if (yAkt > exNord["y"]) {
     exNord["x"] = xAkt;
@@ -1340,6 +1602,15 @@ function extrempunkteNESW(xAkt, yAkt, azi, dist, hWink) {
 
 ##### hoeheAusDistanzUndWinkel #####
 # berechnet die Hoehe eines Punktes, der durch Distanz und Hoehenwinkel von einer bekannten Hoehe definiert ist
+#
+# Parameter:
+#  Z-Koordinate PZ (Float)
+#  Distanz (Float)
+#  Hoehenwinkel in gon (Float)
+# Rueckgabewert:
+#  Hoehe anvisierter Punkt (Float)
+# aendert:
+#  nichts
 function hoeheAusDistanzUndWinkel(z, dist, hWink,    h) {
   h = gegenkathAusHypothUndAlpha(dist, hWink);
   h = h + ekrref(dist);
@@ -1348,6 +1619,16 @@ function hoeheAusDistanzUndWinkel(z, dist, hWink,    h) {
 
 ##### maxDists #####
 # Bilden eines Quadrats um das Projektionszentrum im Abstand von 'maxDist'
+#
+# Parameter:
+#  X-Koordinate PZ (Float)
+#  Y-Koordinate PZ (Float)
+#  Distanz (Float)
+#  Himmelsrichtung (String)
+# Rueckgabewert:
+#  Koordinate in gewuenschter Distanz und Himmelsrichtung (Float)
+# aendert:
+#  nichts
 function maxDists(x, y, maxDist, ri) {
   if (ri == "N")
     return y + maxDist;
@@ -1364,6 +1645,13 @@ function maxDists(x, y, maxDist, ri) {
 ##### modellhoehe #####
 # einlesen der numerischen Ausgabe von Skyplot
 # ermitteln der Modellhoehe und zurueckliefern
+#
+# Parameter:
+#  Resultat von skyplot (File)
+# Rueckgabewert:
+#  durch skyplot ermittelte Modellhoehe (Float)
+# aendert:
+#  nichts
 function modellhoehe(res,    mh) {
   while ((getline < res) > 0)
     if ($0 ~ /^Model/) {
@@ -1376,6 +1664,13 @@ function modellhoehe(res,    mh) {
 
 ##### namBeschreibung #####
 # Ausgeben des genauen Namens der angegebenen Namendatei
+#
+# Parameter:
+#  Namensfile-Typ (String)
+# Rueckgabewert:
+#  zugehoerige Beschreibung (String)
+# aendert:
+#  nichts
 function namBeschreibung(namTyp,    i) {
   for (i = 1; i <= anzNamFiles; i++)
     if (namTyp == namKuerz[i]  ".txt")
@@ -1389,6 +1684,17 @@ function namBeschreibung(namTyp,    i) {
 # die Felder muessen mit substr extrahiert werden, weil sie in einem fixen Kolonnenformat vorliegen
 # Werte werden auf Ganzzahlen gerundet
 # Anzahl Datenzeilen zurueckliefern
+#
+# Parameter:
+#  Namenfile (File)
+# Rueckgabewert:
+#  Anzahl Datenzeilen (Integer)
+# aendert:
+#  namName (Array)
+#  namX (Array)
+#  namY (Array)
+#  namZ (Array)
+#  namCode (Array)
 function namEinlesen(namFile,    i) {
   new(namName);
   new(namX);
@@ -1413,6 +1719,14 @@ function namEinlesen(namFile,    i) {
 
 ##### namKopieren #####
 # Namensfile ins Arbeitsverzeichnis kopieren
+#
+# Parameter:
+#  Namensfile-Typ (String)
+#  Namensfile-Name (File)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function namKopieren(namTyp,    i, kopiert) {
   for (i = 1; i <= anzNamFiles; i++)
     if (namTyp == namKuerz[i] ".txt") {
@@ -1428,6 +1742,15 @@ function namKopieren(namTyp,    i, kopiert) {
 # nur Datenzeilen beruecksichtigen (Zeile 2 ff)
 # aus den 3 Feldern die Arrays 'namKuerz', 'namPfad' und 'namBeschr' bilden
 # Anzahl Datenzeilen zurueckliefern
+#
+# Parameter:
+#  Liste der Namenfiles (File)
+# Rueckgabewert:
+#  Anzahl Datenzeilen (Integer)
+# aendert:
+#  namKuerz (Array)
+#  namPfad (Array)
+#  namBeschr (Array)
 function namListeEinlesen(namListe,    i) {
   new(namKuerz);
   new(namPfad);
@@ -1454,6 +1777,18 @@ function namListeEinlesen(namListe,    i) {
 # einlesen des temporaeren Namensfiles
 # aus den Daten die Arrays 'namtName', 'namtZ', 'namtD' (Entfernung) sowie 'namtX' und 'namtY' fuer die Bildkoordinaten und 'namtC' fuer den Namenscode bilden
 # Anzahl Datenzeilen zurueckliefern
+#
+# Parameter:
+#  Namenfile (File)
+# Rueckgabewert:
+#  Anzahl Datenzeilen (Integer)
+# aendert:
+#  namtName (Array)
+#  namtZ (Array)
+#  namtD (Array)
+#  namtX (Array)
+#  namtY (Array)
+#  namtC (Array)
 function namTmpEinlesen(namTmpFile,    i) {
   new(namtName);
   new(namtZ);
@@ -1488,6 +1823,17 @@ function namTmpEinlesen(namTmpFile,    i) {
 # die Distanz zum Punkt wird ins Array 'panoDist' eingetragen
 # der relative Distanzwert wird ins Array 'panoDiRel' eingetragen
 # Anzahl Datenzeilen zurueckliefern
+#
+# Parameter:
+#  Pano-Silhouettenfile (File)
+# Rueckgabewert:
+#  Anzahl Datenzeilen (Integer)
+# aendert:
+#  panoX (Array)
+#  panoY (Array)
+#  panoLage (Array)
+#  panoDist (Array)
+#  panoDiRel (Array)
 function panoEinlesen(panoFile,    i) {
   new(panoX);
   new(panoY);
@@ -1518,6 +1864,13 @@ function panoEinlesen(panoFile,    i) {
 # nur Datenzeilen beruecksichtigen (Zeile 2 ff)
 # aus den Eintraegen das Array 'params' bilden
 # Anzahl Parameter zurueckliefern
+#
+# Parameter:
+#  Liste der Parameter (File)
+# Rueckgabewert:
+#  Anzahl Parameter (Integer)
+# aendert:
+#  params (Array)
 function paramListeEinlesen(paramListe,    i) {
   new(params);
   i = 0;
@@ -1538,6 +1891,14 @@ function paramListeEinlesen(paramListe,    i) {
 
 ##### printTitel #####
 # gibt vor jeder Berechnung einen Titel in der Konsole aus
+#
+# Parameter:
+#  Version (Float)
+#  Datum (String)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function printTitel(vers, dat,    tit) {
   tit = "\n\
         ***************************************************\n\
@@ -1554,6 +1915,15 @@ function printTitel(vers, dat,    tit) {
 
 ##### prot #####
 # erzeugt Berechnungsprotokoll
+#
+# Parameter:
+#  Protokolldatei (File)
+#  Version (Float)
+#  Berechnungsdauer (Float)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function prot(protFile, vers, berD) {
   printf("Berechnet am : %s\n", strftime("%a. %d. %B %Y, %H:%M Uhr", systime()))                 > protFile;
   printf("Berechnet von: %s\n\n\n", username())                                                  > protFile;
@@ -1610,6 +1980,25 @@ function prot(protFile, vers, berD) {
 
 ##### skyplot #####
 # erzeugt das CMD-File fuer die Skyplot-Berechnung
+#
+# Parameter:
+#  Kommandodatei (File)
+#  Resultat (File)
+#  X-Koordinate PZ (Float)
+#  Y-Koordinate PZ (Float)
+#  Z-Koordinate PZ (Float)
+#  Begrenzung West (Integer)
+#  Begrenzung Sued (Integer)
+#  Begrenzung Ost (Integer)
+#  Begrenzung Nord (Integer)
+#  Azimutale Aufloesung (Float)
+#  Azimut links in gon (Float)
+#  Azimut rechts in gon (Float)
+#  Name PZ (String)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function skyplot(output, res, x, y, z, W, S, E, N, auflAzi, aziLi, aziRe, name) {
   printf("SKYPLOT,POSITION=(%s,%s),\n", x, y)                        > output;
   printf("        HEIGHT=%s,\n", z)                                  > output;
@@ -1632,6 +2021,15 @@ function skyplot(output, res, x, y, z, W, S, E, N, auflAzi, aziLi, aziRe, name) 
 # die Felder muessen mit substr extrahiert werden, weil sie direkt aneinander grenzen
 # die Addition mit 0 erzwingt die Konvertierung in eine Zahl
 # Anzahl Datenzeilen zurueckliefern
+#
+# Parameter:
+#  skyplot-Ergebnis (File)
+# Rueckgabewert:
+#  Anzahl Datenzeilen (Integer)
+# aendert:
+#  azi (Array)
+#  hoehenwinkel (Array)
+#  distanz (Array)
 function skyplotEinlesen(res,    i) {
   new(azi);
   new(hoehenwinkel);
@@ -1655,6 +2053,13 @@ function skyplotEinlesen(res,    i) {
 # Naeherungsformel für die Berechnung der theoretischen Aussichtsweite eines Punktes in Metern
 # (1 - k): setzt sich zusammen aus 1 minus mittlerer Refraktionskoeffizient (~0.13)
 # erdRad ist der Erdradius, der mit 6370000  m festgelegt wird (gleicher Wert wie SCOP.SKYPLOT)
+#
+# Parameter:
+#  Z-Koordinate PZ (Float)
+# Rueckgabewert:
+#  Theoretische Aussichtsweite (Float)
+# aendert:
+#  nichts
 function theoausweit(z,    k, erdRad) {
   erdRad = 6370000 ;
   k = 0.13;
@@ -1663,6 +2068,13 @@ function theoausweit(z,    k, erdRad) {
 
 ##### usage #####
 # gibt aus, wie das Programm parametrisiert werden muss
+#
+# Parameter:
+#  Version (Float)
+# Rueckgabewert:
+#  keinen
+# aendert:
+#  nichts
 function usage(vers) {
   printf("\nskyplot2pano v%s, https://github.com/ABoehlen/skyplot2pano\n", vers)
   printf("\n%s\n", rep(141, "*"));
